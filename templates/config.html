@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html>
+<head>
+<link rel='shortcut icon' type='image/x-icon' href='https://emojipedia-us.s3.dualstack.us-west-1.amazonaws.com/thumbs/120/microsoft/209/television_1f4fa.png' />
+<title>STB Proxy</title>
+</head>
+<body>
+<h2>STB Proxy</h2>
+<form action="/submit" method="post" target="frame">
+<label for="portal">Portal:</label><br>
+<input type="text" id="portal" name="portal" value={{ portal }}><br>
+<label for="lname">MAC:</label><br>
+<input type="text" id="mac" name="mac" value={{ mac }}><br><br>
+<input type="submit" value="Submit"><br>
+</form>
+<iframe name="frame" style="display:none;"></iframe>
+</body>
+</html>
