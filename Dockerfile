@@ -2,6 +2,8 @@ FROM alpine:latest
 
 ENV HOST=localhost
 
+ENV CONFIG=/config/config.json
+
 RUN apk add \
 	py3-pip
 
