@@ -12,14 +12,22 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 app = FastAPI()
-host = os.getenv('HOST')
-config_file = "/config/config.json"
-BASE_PATH = Path(__file__).resolve().parent
-templates = Jinja2Templates(directory=str(BASE_PATH / "templates"))
+base_path = Path(__file__).resolve().parent
+templates = Jinja2Templates(directory=str(base_path / "templates"))
 portal = "www.example.com"
 mac = "00:00:00:00:00:00"
 path = "/portal.php"
 token = "1234"
+
+if os.getenv('HOST'):
+    host = os.getenv('HOST')
+else:
+    host = "localhost:8001"
+
+if os.getenv('CONFIG'):
+    config_file = os.getenv('CONFIG')
+else:
+    config_file = str(base_path) + "/config.json"
 
 def getconfig():
     global portal, mac, path
