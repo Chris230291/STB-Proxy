@@ -29,6 +29,11 @@ if os.getenv('CONFIG'):
 else:
     config_file = str(base_path) + "/config.json"
 
+session = requests.Session()
+retries = Retry(total=5, backoff_factor=0.2, status_forcelist=[500, 502, 503, 504], allowed_methods=frozenset(['GET', 'POST']))
+session.mount('http://', HTTPAdapter(max_retries=retries))
+session.mount('https://', HTTPAdapter(max_retries=retries))
+
 def getconfig():
     global portal, mac, path
     if os.path.isfile(config_file):
@@ -51,123 +56,75 @@ def getconfig():
 def gettoken():
     cookies = {'mac': mac, 'stb_lang': 'en', 'timezone': 'Europe/London'}
     headers = {'User-Agent': 'Mozilla/5.0 (QtEmbedded; U; Linux; C)'}
-    with requests.Session() as s:
-        retries = Retry(
-        total=5,
-        backoff_factor=0.2,
-        status_forcelist=[500, 502, 503, 504]),
-        allowed_methods = frozenset(['GET', 'POST'])
-        s.mount('http://', HTTPAdapter(max_retries=retries))
-        s.mount('https://', HTTPAdapter(max_retries=retries))
-        try:
-            response = s.post(portal + path + '?type=stb&action=handshake&JsHttpRequest=1-xml', cookies=cookies, headers=headers)
-            data = response.json()
-            token = data['js']['token']
-        except:
-            token = None
+    try:
+        response = session.post(portal + path + '?type=stb&action=handshake&JsHttpRequest=1-xml', cookies=cookies, headers=headers)
+        data = response.json()
+        token = data['js']['token']
+    except:
+        token = None
     return token
 
 def getprofile():
     cookies = {'mac': mac, 'stb_lang': 'en', 'timezone': 'Europe/London'}
     headers = {'User-Agent': 'Mozilla/5.0 (QtEmbedded; U; Linux; C)', 'Authorization': 'Bearer ' + token}
-    with requests.Session() as s:
-        retries = Retry(
-        total=5,
-        backoff_factor=0.2,
-        status_forcelist=[500, 502, 503, 504]),
-        allowed_methods = frozenset(['GET', 'POST'])
-        s.mount('http://', HTTPAdapter(max_retries=retries))
-        s.mount('https://', HTTPAdapter(max_retries=retries))
-        try:
-            response = s.post(portal + path + '?type=stb&action=get_profile&JsHttpRequest=1-xml', cookies=cookies, headers=headers)
-            data = response.json()
-        except:
-            data = None
+    try:
+        response = session.post(portal + path + '?type=stb&action=get_profile&JsHttpRequest=1-xml', cookies=cookies, headers=headers)
+        data = response.json()
+    except:
+        data = None
     return data
 
 def getinfo():
     cookies = {'mac': mac, 'stb_lang': 'en', 'timezone': 'Europe/London'}
     headers = {'User-Agent': 'Mozilla/5.0 (QtEmbedded; U; Linux; C)', 'Authorization': 'Bearer ' + token}
-    with requests.Session() as s:
-        retries = Retry(
-        total=5,
-        backoff_factor=0.2,
-        status_forcelist=[500, 502, 503, 504]),
-        allowed_methods = frozenset(['GET', 'POST'])
-        s.mount('http://', HTTPAdapter(max_retries=retries))
-        s.mount('https://', HTTPAdapter(max_retries=retries))
-        try:
-            response = s.post(portal + path + '?type=account_info&action=get_main_info&JsHttpRequest=1-xml', cookies=cookies, headers=headers)
-            data = response.json()
-        except:
-            data = None
+    try:
+        response = session.post(portal + path + '?type=account_info&action=get_main_info&JsHttpRequest=1-xml', cookies=cookies, headers=headers)
+        data = response.json()
+    except:
+        data = None
     return data
 
 def getgenres():
     cookies = {'mac': mac, 'stb_lang': 'en', 'timezone': 'Europe/London'}
     headers = {'User-Agent': 'Mozilla/5.0 (QtEmbedded; U; Linux; C)', 'Authorization': 'Bearer ' + token}
-    with requests.Session() as s:
-        retries = Retry(
-        total=5,
-        backoff_factor=0.2,
-        status_forcelist=[500, 502, 503, 504]),
-        allowed_methods = frozenset(['GET', 'POST'])
-        s.mount('http://', HTTPAdapter(max_retries=retries))
-        s.mount('https://', HTTPAdapter(max_retries=retries))
-        try:
-            response = s.post(portal + path + '?action=get_genres&type=itv&JsHttpRequest=1-xml', cookies=cookies, headers=headers)
-            data = response.json()['js']
-            genres = {}
-            for i in data:
-                gid = i['id']
-                name = i['title']
-                genres[gid] = name
-        except:
-            genres = None
+    try:
+        response = session.post(portal + path + '?action=get_genres&type=itv&JsHttpRequest=1-xml', cookies=cookies, headers=headers)
+        data = response.json()['js']
+        genres = {}
+        for i in data:
+            gid = i['id']
+            name = i['title']
+            genres[gid] = name
+    except:
+        genres = None
     return genres
 
 def makeplaylist():
     cookies = {'mac': mac, 'stb_lang': 'en', 'timezone': 'Europe/London'}
     headers = {'User-Agent': 'Mozilla/5.0 (QtEmbedded; U; Linux; C)', 'Authorization': 'Bearer ' + token}
-    with requests.Session() as s:
-        retries = Retry(
-        total=5,
-        backoff_factor=0.2,
-        status_forcelist=[500, 502, 503, 504]),
-        allowed_methods = frozenset(['GET', 'POST'])
-        s.mount('http://', HTTPAdapter(max_retries=retries))
-        s.mount('https://', HTTPAdapter(max_retries=retries))
-        try:
-            response = s.post(portal + path + '?type=itv&action=get_all_channels&force_ch_link_check=&JsHttpRequest=1-xml', cookies=cookies, headers=headers)
-            data = response.json()['js']['data']
-            channels = []
-            for i in data:
-                chid = i['id']
-                name = i['name']
-                channels.append('#EXTINF:-1,' + name + '\n' + 'http://' + host + '/channel/' + chid)
-            playlist = '#EXTM3U \n'
-            playlist = playlist + "\n".join(channels)
-        except:
-            playlist = None
+    try:
+        response = session.post(portal + path + '?type=itv&action=get_all_channels&force_ch_link_check=&JsHttpRequest=1-xml', cookies=cookies, headers=headers)
+        data = response.json()['js']['data']
+        channels = []
+        for i in data:
+            chid = i['id']
+            name = i['name']
+            channels.append('#EXTINF:-1,' + name + '\n' + 'http://' + host + '/channel/' + chid)
+        playlist = '#EXTM3U \n'
+        playlist = playlist + "\n".join(channels)
+    except:
+        playlist = None
     return playlist
 
 def getlink(channel):
     cookies = {'mac': mac, 'stb_lang': 'en', 'timezone': 'Europe/London'}
     headers = {'User-Agent': 'Mozilla/5.0 (QtEmbedded; U; Linux; C)', 'Authorization': 'Bearer ' + token}
-    with requests.Session() as s:
-        retries = Retry(
-        total=5,
-        backoff_factor=0.2,
-        status_forcelist=[500, 502, 503, 504]),
-        allowed_methods = frozenset(['GET', 'POST'])
-        s.mount('http://', HTTPAdapter(max_retries=retries))
-        s.mount('https://', HTTPAdapter(max_retries=retries))
-        try:
-            response = s.post(portal + path + '?type=itv&action=create_link&cmd=http://localhost/ch/' + str(channel) + '&JsHttpRequest=1-xml', cookies=cookies, headers=headers)
-            data = response.json()
-            link = data['js']['cmd'].split()[-1]
-        except:
-            link = None
+    try:
+        response = session.post(portal + path + '?type=itv&action=create_link&cmd=http://localhost/ch/' + str(channel) + '&JsHttpRequest=1-xml', cookies=cookies, headers=headers)
+        data = response.json()
+        link = data['js']['cmd'].split()[-1]
+    except:
+        link = None
     return link
 
 @app.get('/', response_class=HTMLResponse)
@@ -178,18 +135,10 @@ def config(request: Request):
 @app.post("/submit")
 def submit(request: Request, portal: str = Form(...), mac: str = Form (...)):
     portal = urlparse(portal).scheme + "://" + urlparse(portal).netloc
-    with requests.Session() as s:
-            retries = Retry(
-            total=5,
-            backoff_factor=0.2,
-            status_forcelist=[500, 502, 503, 504]),
-            allowed_methods = frozenset(['GET', 'POST'])
-            s.mount('http://', HTTPAdapter(max_retries=retries))
-            s.mount('https://', HTTPAdapter(max_retries=retries))
-            try:
-                response = s.get(portal + "/c/")
-            except:
-                response = None
+    try:
+        response = session.get(portal + "/c/")
+    except:
+        response = None
     if response:
         path = "/portal.php"
     else:
@@ -200,7 +149,8 @@ def submit(request: Request, portal: str = Form(...), mac: str = Form (...)):
     global token
     getconfig()
     token = gettoken()
-    if token and getprofile() and getinfo():
+    getprofile()
+    if makeplaylist():
         html = '''
             <!DOCTYPE html>
             <html>
@@ -232,11 +182,17 @@ def submit(request: Request, portal: str = Form(...), mac: str = Form (...)):
 def playlist():
     global token
     getconfig()
-    if token and getprofile() and getinfo():
-        return PlainTextResponse(makeplaylist())
+    if token == None:
+        token = gettoken()
+    getprofile()
+    playlist = makeplaylist()
+    if playlist:
+        return PlainTextResponse(playlist)
     else:
         token = gettoken()
-        if token and getprofile() and getinfo():
+        getprofile()
+        playlist =makeplaylist()
+        if playlist:
             return PlainTextResponse(makeplaylist())
         else:
             print("Bad credentials")
@@ -245,12 +201,18 @@ def playlist():
 def channel(chid):
     global token
     getconfig()
-    if token and getprofile() and getinfo():
-        return RedirectResponse(getlink(chid))
+    if token == None:
+        token = gettoken()
+    getprofile()
+    link = getlink(chid)
+    if link:
+        return RedirectResponse(link)
     else:
         token = gettoken()
-        if token and getprofile() and getinfo():
-            return RedirectResponse(getlink(chid))
+        getprofile()
+        link = getlink(chid)
+        if link:
+            return RedirectResponse(link)
         else:
             print("Bad credentials")
 
