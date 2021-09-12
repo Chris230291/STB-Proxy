@@ -1,0 +1,99 @@
+/* All */
+html *{
+  font-family: 'Courier New', monospace;
+}
+
+body {
+  background-color: #616161;
+}
+
+input[type="text"] {
+     width: 100%; 
+     box-sizing: border-box;
+     -webkit-box-sizing:border-box;
+     -moz-box-sizing: border-box;
+}
+
+/* Nav */
+.logobar {
+  overflow: hidden;
+  background-color: #333;
+}
+
+.logo {
+  padding: 14px 16px;
+  width: 40px;
+  float: left;
+}
+
+.donate {
+  padding: 14px 16px;
+  width: 40px;
+  float: right;
+}
+
+.github {
+  padding: 14px 16px;
+  width: 40px;
+  float: right;
+}
+
+.title {
+  float: left;
+  text-align: center;
+  color: #f2f2f2;
+  font-size: 40px;
+  padding: 14px 16px;
+  margin: 0px;
+}
+
+.topnav {
+  overflow: hidden;
+  background-color: #333;
+}
+
+.topnav a {
+  float: left;
+  color: #f2f2f2;
+  text-align: center;
+  padding: 14px 16px;
+  text-decoration: none;
+  font-size: 17px;
+  font-weight: bold;
+}
+
+.topnav a:hover {
+  background-color: #e0fff3;
+  color: black;
+}
+
+.topnav a.active {
+  background-color: #04AA6D;
+  color: white;
+}
+
+/* Tables */
+table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+td, th {
+  border: 1px solid #dddddd;
+  text-align: left;
+  padding: 8px;
+  white-space: nowrap;
+}
+
+th {
+  background-color: #04AA6D;
+  color: #ffffff;
+}
+
+tr {
+  background-color: #ffffff;
+}
+
+tr:nth-child(even) {
+  background-color: #e0fff3;
+}

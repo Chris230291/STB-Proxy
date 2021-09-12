@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+<link rel="stylesheet" href="../static/style.css">
+<link rel="shortcut icon" type="image/png" href="../static/tv.png"/>
+<title>STB Proxy</title>
+</head>
+
+<body>
+
+<div class="logobar">
+<img src="../static/tv.png" alt="logo" class="logo">
+<h4 class ="title">STB Proxy</h4>
+<a href="https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=62MYXSBT75D4E" target="_blank"><img src="../static/beer.png" alt="donate" class="donate"></a>
+<a href="https://github.com/Chris230291/STB-Proxy" target="_blank"><img src="../static/github.png" alt="github" class="github"></a>
+</div>
+<br>
+<div class="topnav">
+<a class="active" href="/portals">Portals</a>
+<a href="/editor">Playlist Editor</a>
+<a href="/player">Player</a>
+</div>
+
+<br>
+
+<table>
+<tr>
+<th>Name</th>
+<th>Portal</th>
+<th>Mac</th>
+<th>Exipres</th>
+<th width="1%"></th>
+<th width="1%"></th>
+</tr>
+
+{% if portals is not none %}
+{% for portal in portals %}
+<tr>
+<form action="/portal/edit" method="post" name="hi">
+<td width="50%">
+<input type="text" name="oname" class="textfield" value="{{ portal['name'] }}" hidden>
+<input type="text" name="name" class="textfield" required pattern="{{ blacklists[loop.index0] }}" title="Name must be unique and can only contain letters, numbers, underscores and dashes" value="{{ portal['name'] }}">
+</td>
+<td width="50%"><input type="text" name="url" class="textfield" required pattern="^(http|https):\/\/.*$" title="Enter a valid URL starting with 'http|s://'" value="{{ portal['url'] }}"></td>
+<td style="min-width:230px"><input type="text" name="mac" class="textfield" required pattern="^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$"title="Enter a valid MAC address" value="{{ portal['mac'] }}"></td>
+<td>{{ portal['expires'] }}</td>
+<td>
+<input type="submit" value="Edit">
+</td>
+</form>
+<td>
+<form action="/portal/remove" method="post">
+<button name="name" value="{{ portal['name'] }}">Remove</button>
+</form>
+</td>
+</tr>
+{% endfor %}
+{% endif %}
+
+<tr>
+<form action="/portal/add" method="post">
+<td><input type="text" name="name" class="textfield" required pattern="{{ masterBlacklist }}" title="Name must be unique and can only contain letters, numbers, underscores and dashes"></td>
+<td><input type="text" name="url" class="textfield" required pattern="^(http|https):\/\/.*$" title="Enter a valid URL starting with 'http|s://'"></td>
+<td><input type="text" name="mac" class="textfield" required pattern="^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$"title="Enter a valid MAC address"></td>
+<td colspan="2"></td>
+
+<td><input type="submit" value="Add" style="width:100%"></td>
+</form>
+</tr>
+</table>
+
+</body>
+
+</html> 

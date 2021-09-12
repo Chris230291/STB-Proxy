@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+<link rel="stylesheet" href="../static/style.css">
+<link rel="shortcut icon" type="image/png" href="../static/tv.png"/>
+<title>STB Proxy</title>
+</head>
+
+<body>
+
+<div class="logobar">
+<img src="../static/tv.png" alt="logo" class="logo">
+<h4 class ="title">STB Proxy</h4>
+<a href="https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=62MYXSBT75D4E" target="_blank"><img src="../static/beer.png" alt="donate" class="donate"></a>
+<a href="https://github.com/Chris230291/STB-Proxy" target="_blank"><img src="../static/github.png" alt="github" class="github"></a>
+</div>
+<br>
+<div class="topnav">
+<a href="/portals">Portals</a>
+<a class="active" href="/editor">Playlist Editor</a>
+<a href="/player">Player</a>
+</div>
+
+<script>
+var enabledEdits = [];
+var nameEdits = [];
+var genreEdits = [];
+
+function editAll(ele) {
+checkboxes = document.getElementsByClassName('checkbox');
+for(var i=0, n=checkboxes.length;i<n;i++) {
+checkboxes[i].checked = ele.checked;
+editEnabled(checkboxes[i])
+}
+}
+
+function editEnabled(ele) { 
+var p = ele.getAttribute('data-portalName');
+var i = ele.getAttribute('data-channelId');
+var c = ele.checked;
+var j = {"portal":p, "channel id":i, "enabled":c};
+enabledEdits.push(j);
+}
+
+function editCustomName(ele) {
+var p = ele.getAttribute('data-portalName');
+var i = ele.getAttribute('data-channelId');
+var c = ele.value;
+var j = {"portal":p, "channel id":i, "custom name":c};
+nameEdits.push(j);
+}
+
+function editCustomGenre(ele) {
+var p = ele.getAttribute('data-portalName');
+var i = ele.getAttribute('data-channelId');
+var c = ele.value;
+var j = {"portal":p, "channel id":i, "custom genre":c};
+genreEdits.push(j);
+}
+
+function save() {
+document.getElementById("enabledEdits").value = JSON.stringify(enabledEdits);
+document.getElementById("nameEdits").value = JSON.stringify(nameEdits);
+document.getElementById("genreEdits").value = JSON.stringify(genreEdits);
+document.getElementById("save edits").submit();
+}
+</script>
+
+<br>
+<form action="/editor/save" method="post" id="save edits">
+<input type="text" id="enabledEdits" name="enabledEdits" value="" hidden>
+<input type="text" id="nameEdits" name="nameEdits" value="" hidden>
+<input type="text" id="genreEdits" name="genreEdits" value="" hidden>
+<input type="button" onclick="save()" value="Save">
+</form> 
+<br>
+
+<table>
+<tr>
+<th><input type="checkbox" onchange="editAll(this)"></th>
+<th width="25%">Channel Name</th>
+<th width="25%">Custom Name</th>
+<th width="25%">Genre</th>
+<th width="25%">Custom Genre</th>
+<th>Portal</th>
+</tr>
+{% if channels|length > 0 %}
+{% for channel in channels %}
+<tr>
+{% if channel['enabled'] %}
+<td><input type="checkbox" class="checkbox" onchange="editEnabled(this)" data-portalName="{{ channel['portalName'] }}" data-channelId="{{ channel['channelId'] }}" checked></td>
+{% else %}
+<td><input type="checkbox" class="checkbox" onchange="editEnabled(this)" data-portalName="{{ channel['portalName'] }}" data-channelId="{{ channel['channelId'] }}"></td>
+{% endif %}
+<td>{{ channel['channelName'] }}</td>
+<td><input type="text" class="textfield" onchange="editCustomName(this)" data-portalName="{{ channel['portalName'] }}" data-channelId="{{ channel['channelId'] }}" value="{{ channel['customChannelName'] }}"></td>
+<td>{{ channel['genre'] }}</td>
+<td><input type="text" class="textfield" onchange="editCustomGenre(this)" data-portalName="{{ channel['portalName'] }}" data-channelId="{{ channel['channelId'] }}" value="{{ channel['customGenre'] }}"></td>
+<td>{{ channel['portalName'] }}</td>
+</tr>
+{% endfor %}
+{% else %}
+<td colspan="6" style="text-align:center">No working portals! Go to the portals tab, add a working portal then come back.</td>
+{% endif %}
+</table>
+
+</body>
+
+</html> 
