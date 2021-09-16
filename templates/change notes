@@ -1,0 +1,5 @@
+- fixed pre buffering issue on player
+- added support for proxies
+- added option to force stream
+- added option to select stream format
+- added back try statements with a description of the failure to help users give feedback
