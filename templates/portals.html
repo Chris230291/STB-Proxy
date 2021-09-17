@@ -21,7 +21,6 @@
     <div class="topnav">
         <a class="active" href="/portals">Portals</a>
         <a href="/editor">Playlist Editor</a>
-        <a href="/options">Options</a>
         <a href="/player">Player</a>
     </div>
 
@@ -33,6 +32,7 @@
             <th width="25%">Portal</th>
             <th width="15%">Mac</th>
             <th width="25%">Proxy</th>
+            <th width="1%">Format</th>
             <th>Exipres</th>
             <th width="1%"></th>
             <th width="1%"></th>
@@ -53,8 +53,15 @@
                 <td><input type="text" name="mac" class="textfield" required
                         pattern="^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$" title="Enter a valid MAC address"
                         value="{{ portal['mac'] }}"></td>
-                <td><input type="text" name="proxy" class="textfield" pattern="^(http|https):\/\/.*$"
-                        title="Enter a valid URL starting with 'http|s://'" value="{{ portal['proxy'] }}"></td>
+                <td><input type="text" name="proxy" class="textfield" onchange="setFormat(this)"
+                        pattern="^(http|https):\/\/.*$" title="Enter a valid URL starting with 'http|s://'"
+                        value="{{ portal['proxy'] }}"></td>
+                <td> <select name="format" data-format="{{ portal['format'] }}">
+                        <option value="redirect">Redirect</option>
+                        <option value="mp4">MP4</option>
+                        <option value="hls">HLS</option>
+                        <option value="mpegts">MPEG-TS</option>
+                    </select></td>
                 <td>{{ portal['expires'] }}</td>
                 <td>
                     <input type="submit" value="Edit">
@@ -76,13 +83,41 @@
                         title="Enter a valid URL starting with 'http|s://'"></td>
                 <td><input type="text" name="mac" class="textfield" required
                         pattern="^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$" title="Enter a valid MAC address"></td>
-                <td><input type="text" name="proxy" class="textfield" pattern="^(http|https):\/\/.*$"
-                        title="Enter a valid URL starting with 'http|s://'"></td>
+                <td><input type="text" name="proxy" class="textfield" onchange="setFormat(this)"
+                        pattern="^(http|https):\/\/.*$" title="Enter a valid URL starting with 'http|s://'"></td>
+                <td> <select name="format" data-format="redirect">
+                        <option value="redirect">Redirect</option>
+                        <option value="mp4">MP4</option>
+                        <option value="hls">HLS</option>
+                        <option value="mpegts">MPEG-TS</option>
+                    </select></td>
                 <td colspan="2"></td>
                 <td><input type="submit" value="Add" style="width:100%"></td>
             </form>
         </tr>
     </table>
+
+    <script>
+        var formatLists = document.getElementsByName("format")
+        for (var i = 0; i < formatLists.length; i++) {
+            formatLists[i].value = formatLists[i].getAttribute('data-format');
+            setFormat(formatLists[i]);
+        }
+
+        function setFormat(ele) {
+            var row = ele.parentElement.parentElement;
+            var proxy = row.querySelector('input[name="proxy"]').value;
+            var format = row.querySelector('select[name="format"]');
+            if (proxy !== "") {
+                format.options[0].disabled = true;
+                if (format.value == "redirect" || format.value == "") {
+                    format.value = "mp4";
+                }
+            }
+            else
+                format.options[0].disabled = false;
+        }
+    </script>
 
 </body>
 

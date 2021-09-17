@@ -13,7 +13,6 @@ import os
 from pathlib import Path
 from urllib.parse import urlparse
 import subprocess
-from typing import Optional
 import datetime
 
 app = FastAPI()
@@ -39,28 +38,24 @@ session.mount('http://', HTTPAdapter(max_retries=retries))
 session.mount('https://', HTTPAdapter(max_retries=retries))
 
 
-def getConfig():
-    if os.path.isfile(config_file) == False:
+def getPortals():
+    try:
+        with open(config_file) as f:
+            data = json.load(f)
+            portals = data['portals']
+    except:
         print("Creating config file")
         data = {}
         data['portals'] = []
-        data['options'] = {}
-    with open(config_file) as f:
-        data = json.load(f)
-        edited = False
-        if 'portals' not in data:
-            data['portals'] = []
-            edited = True
-        if 'options' not in data:
-            data['options'] = {}
-            edited = True
-        if edited:
-            saveConfig(data)
-    return data
+        portals = []
+        savePortals(portals)
+    return portals
 
 
-def saveConfig(data):
+def savePortals(portals):
     with open(config_file, 'w') as f:
+        data = {}
+        data['portals'] = portals
         json.dump(data, f, indent=4)
 
 
@@ -118,7 +113,7 @@ def portals(request: Request):
     names = []
     masterBlacklist = "^((?=[a-zA-Z0-9_-]+).)*$"
     blacklists = []
-    portals = getConfig()['portals']
+    portals = getPortals()
     if portals and len(portals) > 0:
         for i in portals:
             names.append(i['name'])
@@ -136,7 +131,7 @@ def portals(request: Request):
 
 
 @app.post("/portal/add")
-def add(request: Request, name: str = Form(...), url: str = Form(...), mac: str = Form(...), proxy: str = Form("")):
+def add(request: Request, name: str = Form(...), url: str = Form(...), mac: str = Form(...), proxy: str = Form(""), format: str = Form(...)):
     url = urlparse(url).scheme + "://" + urlparse(url).netloc
     try:
         response = session.get(url + "/c/")
@@ -146,18 +141,16 @@ def add(request: Request, name: str = Form(...), url: str = Form(...), mac: str 
         url = url + "/portal.php"
     else:
         url = url + "/stalker_portal/server/load.php"
-    data = getConfig()
-    portals = data['portals']
+    portals = getPortals()
     token = getToken(url, mac)
-    portals.append({"name": name, "url": url, "mac": mac, "proxy": proxy, "expires": getExpires(
+    portals.append({"name": name, "url": url, "mac": mac, "proxy": proxy, "format":format, "expires": getExpires(
         url, mac, token), "enabled channels": [], "custom channel names": {}, "custom genres": {}})
-    data['portals'] = portals
-    saveConfig(data)
+    savePortals(portals)
     return RedirectResponse('/portals', status_code=302)
 
 
 @app.post("/portal/edit")
-def edit(request: Request, oname: str = Form(...), name: str = Form(...), url: str = Form(...), mac: str = Form(...), proxy: str = Form("")):
+def edit(request: Request, oname: str = Form(...), name: str = Form(...), url: str = Form(...), mac: str = Form(...), proxy: str = Form(""), format: str = Form(...)):
     url = urlparse(url).scheme + "://" + urlparse(url).netloc
     try:
         response = session.get(url + "/c/")
@@ -167,39 +160,35 @@ def edit(request: Request, oname: str = Form(...), name: str = Form(...), url: s
         url = url + "/portal.php"
     else:
         url = url + "/stalker_portal/server/load.php"
-    data = getConfig()
-    portals = data['portals']
+    portals = getPortals()
     for i in range(len(portals)):
-        if portals[i]["name"] == oname:
+        if portals[i]['name'] == oname:
             portals[i]['name'] = name
             portals[i]['url'] = url
             portals[i]['mac'] = mac
             portals[i]['proxy'] = proxy
-            token = getToken(url, mac)
-            portals[i]['expires'] = getExpires(url, mac, token)
+            portals[i]['format'] = format
+            portals[i]['expires'] = getExpires(url, mac, getToken(url, mac))
             break
-    data['portals'] = portals
-    saveConfig(data)
+    savePortals(portals)
     return RedirectResponse('/portals', status_code=302)
 
 
 @app.post("/portal/remove")
 def remove(request: Request, name: str = Form(...)):
-    data = getConfig()
-    portals = data['portals']
+    portals = getPortals()
     for i in range(len(portals)):
         if portals[i]["name"] == name:
             portals.pop(i)
             break
-    data['portals'] = portals
-    saveConfig(data)
+    savePortals(portals)
     return RedirectResponse('/portals', status_code=302)
 
 
 @app.get('/editor', response_class=HTMLResponse)
 def editor(request: Request):
     channels = []
-    portals = getConfig()['portals']
+    portals = getPortals()
     if len(portals) > 0:
         for p in portals:
             portalName = p['name']
@@ -250,8 +239,7 @@ def save(request: Request, enabledEdits: str = Form(...), nameEdits: str = Form(
     enabledEdits = json.loads(enabledEdits)
     nameEdits = json.loads(nameEdits)
     genreEdits = json.loads(genreEdits)
-    data = getConfig()
-    portals = data['portals']
+    portals = getPortals()
     for e in enabledEdits:
         portal = e['portal']
         chid = e['channel id']
@@ -292,38 +280,14 @@ def save(request: Request, enabledEdits: str = Form(...), nameEdits: str = Form(
                     customGenres.pop(chid)
                 portals[i]['custom genres'] = customGenres
                 break
-    data['portals'] = portals
-    saveConfig(data)
+    savePortals(portals)
     return RedirectResponse('/editor', status_code=302)
-
-
-@app.get('/options', response_class=HTMLResponse)
-def editor(request: Request):
-    options = getConfig()['options']
-    forceStreaming = options.get('force streaming')
-    if forceStreaming == None:
-        forceStreaming = False
-    streamingFormat = options.get('streaming format')
-    if streamingFormat == False:
-        streamingFormat = "MP4"
-    return templates.TemplateResponse('options.html', {'request': request, 'forceStreaming': forceStreaming, 'streamingFormat': streamingFormat})
-
-
-@app.post("/options/save")
-def save(request: Request, forceStreaming: str = Form(False), streamingFormat: str = Form(...)):
-    if forceStreaming:
-        forceStreaming = True
-    data = getConfig()
-    data['options']['force streaming'] = forceStreaming
-    data['options']['streaming format'] = streamingFormat
-    saveConfig(data)
-    return RedirectResponse('/options', status_code=302)
 
 
 @app.get('/player', response_class=HTMLResponse)
 def player(request: Request):
     channels = []
-    for p in getConfig()['portals']:
+    for p in getPortals():
         portalName = p['name']
         url = p['url']
         mac = p['mac']
@@ -365,7 +329,7 @@ def player(request: Request):
                         except:
                             nex = "No data"
                         link = 'http://' + host + '/stream/' + \
-                            portalName + '/' + channelId + '?format=MP4'
+                            portalName + '/' + channelId + '?format=mp4'
                         channels.append(
                             {"name": channelName, "genre": genre, "link": link, "now": now, "next": nex})
                         channels.sort(key=lambda k: k['name'])
@@ -377,12 +341,12 @@ def player(request: Request):
 @app.get('/playlist')
 def playlist():
     channels = []
-    data = getConfig()
-    for p in getConfig()['portals']:
+    for p in getPortals():
         portalName = p['name']
         url = p['url']
         mac = p['mac']
-        proxy = p.get('proxy')
+        proxy = p['proxy']
+        format = p['format']
         token = getToken(url, mac)
         enabledChannels = p['enabled channels']
         customChannelNames = p['custom channel names']
@@ -410,12 +374,14 @@ def playlist():
                         genre = customGenres.get(channelId)
                         if genre == None:
                             genre = genres.get(i['tv_genre_id'])
-                        if data['options']['force streaming'] or proxy:
+                        if format != "redirect" or proxy:
                             method = "stream"
+                            f = "?format=" + format
                         else:
                             method = "channel"
+                            f = ""
                         channels.append('#EXTINF:-1 group-title="' + genre + '",' + channelName +
-                                        '\n' + 'http://' + host + "/" + method + "/" + portalName + "/" + channelId)
+                                        '\n' + 'http://' + host + "/" + method + "/" + portalName + "/" + channelId + f)
             except:
                 print("Error getting playlist for " + portalName)
     channels.sort(key=lambda k: k.split(',')[1])
@@ -426,7 +392,7 @@ def playlist():
 
 @app.get('/xmltv')
 def xmltv():
-    for p in getConfig()['portals']:
+    for p in getPortals():
         portalName = p['name']
         url = p['url']
         mac = p['mac']
@@ -463,7 +429,7 @@ def xmltv():
 
 @app.get('/channel/{portalName}/{channelId}')
 def channel(portalName, channelId):
-    for p in getConfig()['portals']:
+    for p in getPortals():
         if p['name'] == portalName:
             url = p['url']
             mac = p['mac']
@@ -483,9 +449,9 @@ def channel(portalName, channelId):
 
 
 @app.get('/stream/{portalName}/{channelId}')
-def stream(portalName, channelId, format: Optional[str] = None):
+def stream(portalName, channelId, format: str = "mp4"):
     def streamData(link, proxy, format):
-        if format == "MP4":
+        if format == "mp4":
             ffmpegcmd = [
                 'ffmpeg',
                 '-re',
@@ -500,7 +466,7 @@ def stream(portalName, channelId, format: Optional[str] = None):
                 '-reconnect_on_http_error', '4xx,5xx',
                 'pipe:'
             ]
-        elif format == "MPEG-TS":
+        elif format == "mpegts":
             ffmpegcmd = [
                 'ffmpeg',
                 '-re',
@@ -508,6 +474,20 @@ def stream(portalName, channelId, format: Optional[str] = None):
                 '-i', link,
                 '-c', 'copy',
                 '-f', 'mpegts',
+                '-reconnect_at_eof', '1',
+                '-reconnect_streamed', '1',
+                '-reconnect_on_network_error', '1',
+                '-reconnect_on_http_error', '4xx,5xx',
+                'pipe:'
+            ]
+        elif format == "hls":
+            ffmpegcmd = [
+                'ffmpeg',
+                '-re',
+                '-loglevel', 'panic', '-hide_banner',
+                '-i', link,
+                '-c', 'copy',
+                '-f', 'hls',
                 '-reconnect_at_eof', '1',
                 '-reconnect_streamed', '1',
                 '-reconnect_on_network_error', '1',
@@ -522,7 +502,7 @@ def stream(portalName, channelId, format: Optional[str] = None):
         with subprocess.Popen(ffmpegcmd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE) as ffmpeg_sb:
             yield from iter(ffmpeg_sb.stdout.readline, "")
 
-    for p in getConfig()['portals']:
+    for p in getPortals():
         if p['name'] == portalName:
             url = p['url']
             mac = p['mac']
@@ -539,8 +519,6 @@ def stream(portalName, channelId, format: Optional[str] = None):
         link = data['js']['cmd'].split()[-1]
     except:
         print("Error getting link (stream) for " + portalName + "/" + channelId)
-    if format == None:
-        format = getConfig()['options']['streaming format']
     return StreamingResponse(streamData(link, proxy, format))
 
 
