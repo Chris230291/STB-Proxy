@@ -5,6 +5,8 @@
     <link rel="stylesheet" href="../static/style.css">
     <link rel="shortcut icon" type="image/png" href="../static/tv.png" />
     <title>STB Proxy</title>
+
+
 </head>
 
 <body>
@@ -29,45 +31,52 @@
         <input type="text" id="enabledEdits" name="enabledEdits" value="" hidden>
         <input type="text" id="nameEdits" name="nameEdits" value="" hidden>
         <input type="text" id="genreEdits" name="genreEdits" value="" hidden>
-        <input type="button" onclick="save()" value="Save">
+        <input type="button" id="saveButton" class="buttonSavePlaylist" onclick="save()" value="Save"
+            style="display:none">
     </form>
-    <br>
 
-    <table>
-        <tr>
-            <th><input type="checkbox" onchange="editAll(this)"></th>
-            <th width="25%">Channel Name</th>
-            <th width="25%">Custom Name</th>
-            <th width="25%">Genre</th>
-            <th width="25%">Custom Genre</th>
-            <th>Portal</th>
-        </tr>
-        {% if channels|length > 0 %}
-        {% for channel in channels %}
-        <tr>
-            {% if channel['enabled'] %}
-            <td><input type="checkbox" class="checkbox" onchange="editEnabled(this)"
-                    data-portalName="{{ channel['portalName'] }}" data-channelId="{{ channel['channelId'] }}" checked>
-            </td>
+    <input type="button" id="EnableButton" class="EnableButton" onclick="save()" value="Save" style="display:none">
+
+    <table id="table" style="display:none">
+        <thead>
+            <tr>
+                <th><input type="checkbox" onchange="editAll(this)"></th>
+                <th width="25%">Channel Name</th>
+                <th width="25%">Custom Name</th>
+                <th width="25%">Genre</th>
+                <th width="25%">Custom Genre</th>
+                <th>Portal</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% if channels|length > 0 %}
+            {% for channel in channels %}
+            <tr>
+                {% if channel['enabled'] %}
+                <td><input type="checkbox" class="checkbox" onchange="editEnabled(this)"
+                        data-portalName="{{ channel['portalName'] }}" data-channelId="{{ channel['channelId'] }}"
+                        checked>
+                </td>
+                {% else %}
+                <td><input type="checkbox" class="checkbox" onchange="editEnabled(this)"
+                        data-portalName="{{ channel['portalName'] }}" data-channelId="{{ channel['channelId'] }}"></td>
+                {% endif %}
+                <td>{{ channel['channelName'] }}</td>
+                <td><input type="text" class="textfield" onchange="editCustomName(this)"
+                        data-portalName="{{ channel['portalName'] }}" data-channelId="{{ channel['channelId'] }}"
+                        value="{{ channel['customChannelName'] }}"></td>
+                <td>{{ channel['genre'] }}</td>
+                <td><input type="text" class="textfield" onchange="editCustomGenre(this)"
+                        data-portalName="{{ channel['portalName'] }}" data-channelId="{{ channel['channelId'] }}"
+                        value="{{ channel['customGenre'] }}"></td>
+                <td>{{ channel['portalName'] }}</td>
+            </tr>
+            {% endfor %}
             {% else %}
-            <td><input type="checkbox" class="checkbox" onchange="editEnabled(this)"
-                    data-portalName="{{ channel['portalName'] }}" data-channelId="{{ channel['channelId'] }}"></td>
+            <td colspan="6" style="text-align:center">No working portals! Go to the portals tab, add a working portal
+                then come back.</td>
             {% endif %}
-            <td>{{ channel['channelName'] }}</td>
-            <td><input type="text" class="textfield" onchange="editCustomName(this)"
-                    data-portalName="{{ channel['portalName'] }}" data-channelId="{{ channel['channelId'] }}"
-                    value="{{ channel['customChannelName'] }}"></td>
-            <td>{{ channel['genre'] }}</td>
-            <td><input type="text" class="textfield" onchange="editCustomGenre(this)"
-                    data-portalName="{{ channel['portalName'] }}" data-channelId="{{ channel['channelId'] }}"
-                    value="{{ channel['customGenre'] }}"></td>
-            <td>{{ channel['portalName'] }}</td>
-        </tr>
-        {% endfor %}
-        {% else %}
-        <td colspan="6" style="text-align:center">No working portals! Go to the portals tab, add a working portal then
-            come back.</td>
-        {% endif %}
+        </tbody>
     </table>
 
     <script>
@@ -115,6 +124,64 @@
         }
     </script>
 
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+    <script type="text/javascript" charset="utf8"
+        src="https://cdn.datatables.net/1.11.2/js/jquery.dataTables.js"></script>
+
+    <script>
+        /* Create an array with the values of all the checkboxes in a column */
+        $.fn.dataTable.ext.order['dom-checkbox'] = function (settings, col) {
+            return this.api().column(col, { order: 'index' }).nodes().map(function (td, i) {
+                return $('input', td).prop('checked') ? '1' : '0';
+            });
+        }
+
+        /* Create an array with the values of all the input boxes in a column */
+        $.fn.dataTable.ext.order['dom-text'] = function (settings, col) {
+            return this.api().column(col, { order: 'index' }).nodes().map(function (td, i) {
+                return $('input', td).val();
+            });
+        }
+
+        $(document).ready(function () {
+            $('#table').dataTable({
+                "dom": 'lfrtip',
+                "pageLength": 25,
+                "lengthMenu": [[10, 25, 50, 75, 100, -1], [10, 25, 50, 75, 100, "All"]],
+                "orderFixed": [0, 'des'],
+                "order": [[0, 'des'], [1, 'asc']],
+                "autoWidth": false,
+                "columns": [
+                    { "width": "1%", "orderDataType": "dom-checkbox" },
+                    { "width": "20%" },
+                    { "width": "20%", "orderDataType": "dom-text", type: 'string' },
+                    { "width": "20%" },
+                    { "width": "20%", "orderDataType": "dom-text", type: 'string' },
+                    { "width": "1%" }
+                ],
+                "language": {
+                    search: '<i class="fa fa-filter" aria-hidden="true"></i>',
+                    searchPlaceholder: 'Filter',
+                    "lengthMenu": "_MENU_",
+                },
+                stateSave: true,
+                "stateSaveParams": function (settings, data) {
+                    delete time;
+                    delete start;
+                    delete data.order;
+                    delete data.search;
+                    delete data.columns;
+                },
+                "columnDefs": [{
+                    "targets": 0,
+                    "orderable": false,
+                    "searchable": false
+                }]
+            });
+            $('#table').show();
+            $('#saveButton').show();
+        });
+    </script>
 </body>
 
 </html>

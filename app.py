@@ -143,7 +143,7 @@ def add(request: Request, name: str = Form(...), url: str = Form(...), mac: str 
         url = url + "/stalker_portal/server/load.php"
     portals = getPortals()
     token = getToken(url, mac)
-    portals.append({"name": name, "url": url, "mac": mac, "proxy": proxy, "format":format, "expires": getExpires(
+    portals.append({"name": name, "url": url, "mac": mac, "proxy": proxy, "format": format, "expires": getExpires(
         url, mac, token), "enabled channels": [], "custom channel names": {}, "custom genres": {}})
     savePortals(portals)
     return RedirectResponse('/portals', status_code=302)
@@ -230,7 +230,6 @@ def editor(request: Request):
                                     'genre': genre, 'customGenre': customGenre, 'channelId': channelId, 'portalName': portalName})
             except:
                 print("Error getting channels for " + portalName)
-        channels.sort(key=lambda k: (-k['enabled'], k['channelName']))
     return templates.TemplateResponse('editor.html', {'request': request, 'channels': channels})
 
 
@@ -501,6 +500,7 @@ def stream(portalName, channelId, format: str = "mp4"):
 
         with subprocess.Popen(ffmpegcmd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE) as ffmpeg_sb:
             yield from iter(ffmpeg_sb.stdout.readline, "")
+        print("hello")
 
     for p in getPortals():
         if p['name'] == portalName:

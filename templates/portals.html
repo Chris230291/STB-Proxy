@@ -37,7 +37,6 @@
             <th width="1%"></th>
             <th width="1%"></th>
         </tr>
-
         {% if portals is not none %}
         {% for portal in portals %}
         <tr>
@@ -64,12 +63,12 @@
                     </select></td>
                 <td>{{ portal['expires'] }}</td>
                 <td>
-                    <input type="submit" value="Edit">
+                    <input type="submit" class="buttonEditPortal" value="Edit">
                 </td>
             </form>
             <td>
                 <form action="/portal/remove" method="post">
-                    <button name="name" value="{{ portal['name'] }}">Remove</button>
+                    <button name="name" class="buttonRemovePortal" value="{{ portal['name'] }}">Remove</button>
                 </form>
             </td>
         </tr>
@@ -92,7 +91,7 @@
                         <option value="mpegts">MPEG-TS</option>
                     </select></td>
                 <td colspan="2"></td>
-                <td><input type="submit" value="Add" style="width:100%"></td>
+                <td><input type="submit" class="buttonAddPortal" value="Add"></td>
             </form>
         </tr>
     </table>
