@@ -1,6 +1,7 @@
 # STB-Proxy
 
-- Play STB portal streams via m3u player
+- Play STB portal streams in regular m3u media players
+- Configuration through web UI
 - Combine multiple portals
 - Enable/disable channels individually
 - Rename channels
