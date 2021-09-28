@@ -10,7 +10,8 @@ RUN apk add \
 
 RUN pip3 install \
 	flask \
-	requests
+	requests \
+	retrying
 
 # Copy files
 COPY /app.py /app/app.py
