@@ -1,221 +1,170 @@
-import requests
-from requests.adapters import HTTPAdapter
-from urllib3.util import Retry
-import json
-from fastapi import FastAPI, Request, Form
-from fastapi.responses import RedirectResponse
-from fastapi.responses import PlainTextResponse
-from fastapi.responses import HTMLResponse
-from fastapi.responses import StreamingResponse
-from fastapi.templating import Jinja2Templates
-from fastapi.staticfiles import StaticFiles
-import os
+import stb
+from flask import Flask, render_template, redirect, request, Response
 from pathlib import Path
-from urllib.parse import urlparse
+import os
+import sys
+import json
+from urllib import parse
 import subprocess
-import datetime
 
-app = FastAPI()
-base_path = Path(__file__).resolve().parent
-templates = Jinja2Templates(directory=str(base_path / "templates"))
-app.mount("/static", StaticFiles(directory=str(base_path) +
-          "/static"), name="static")
 
-if os.getenv('HOST'):
-    host = os.getenv('HOST')
+app = Flask(__name__)
+basePath = Path(__file__).resolve().parent
+
+
+if os.getenv("HOST"):
+    host = os.getenv("HOST")
 else:
     host = "localhost:8001"
 
-if os.getenv('CONFIG'):
-    config_file = os.getenv('CONFIG')
+if os.getenv("CONFIG"):
+    config_file = os.getenv("CONFIG")
 else:
-    config_file = str(base_path) + "/config.json"
-
-session = requests.Session()
-retries = Retry(total=2, backoff_factor=0.2, status_forcelist=[
-                500, 502, 503, 504], allowed_methods=frozenset(['GET', 'POST']))
-session.mount('http://', HTTPAdapter(max_retries=retries))
-session.mount('https://', HTTPAdapter(max_retries=retries))
+    config_file = str(basePath) + "/config.json"
 
 
 def getPortals():
     try:
         with open(config_file) as f:
             data = json.load(f)
-            portals = data['portals']
+            portals = data["portals"]
     except:
         print("Creating config file")
         data = {}
-        data['portals'] = []
+        data["portals"] = []
         portals = []
         savePortals(portals)
     return portals
 
 
 def savePortals(portals):
-    with open(config_file, 'w') as f:
+    with open(config_file, "w") as f:
         data = {}
-        data['portals'] = portals
+        data["portals"] = portals
         json.dump(data, f, indent=4)
 
 
-def getToken(url, mac):
-    cookies = {'mac': mac, 'stb_lang': 'en', 'timezone': 'Europe/London'}
-    headers = {'User-Agent': 'Mozilla/5.0 (QtEmbedded; U; Linux; C)'}
-    try:
-        response = session.post(
-            url + '?type=stb&action=handshake&JsHttpRequest=1-xml', cookies=cookies, headers=headers)
-        data = response.json()
-        token = data['js']['token']
-        getProfile(url, mac, token)
-    except:
-        print("Error getting token")
-        token = None
-    return token
-
-
-def getProfile(url, mac, token):
-    cookies = {'mac': mac, 'stb_lang': 'en', 'timezone': 'Europe/London'}
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (QtEmbedded; U; Linux; C)', 'Authorization': 'Bearer ' + token}
-    try:
-        response = session.post(
-            url + '?type=stb&action=get_profile&JsHttpRequest=1-xml', cookies=cookies, headers=headers)
-        data = response.json()
-    except:
-        print("Error getting profile")
-        data = None
-    return data
-
-
-def getExpires(url, mac, token):
-    cookies = {'mac': mac, 'stb_lang': 'en', 'timezone': 'Europe/London'}
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (QtEmbedded; U; Linux; C)', 'Authorization': 'Bearer ' + token}
-    response = session.post(
-        url + '?type=account_info&action=get_main_info&JsHttpRequest=1-xml', cookies=cookies, headers=headers)
-    try:
-        data = response.json()
-        expire = data['js']['phone']
-    except:
-        print("Error getting expiry")
-        expires = "?"
-    return expire
-
-
-@app.get('/', response_class=HTMLResponse)
+@app.route("/", methods=["GET"])
 def home():
-    return RedirectResponse('/portals', status_code=302)
+    return redirect("/portals", code=302)
 
 
-@app.get('/portals', response_class=HTMLResponse)
-def portals(request: Request):
+@app.route("/portals", methods=["GET"])
+def portals():
     names = []
     masterBlacklist = "^((?=[a-zA-Z0-9_-]+).)*$"
     blacklists = []
     portals = getPortals()
     if portals and len(portals) > 0:
         for i in portals:
-            names.append(i['name'])
+            names.append(i["name"])
         # ^((?!^word1$|^word2$)(?=[a-zA-Z0-9_-]+).)*$
-        masterBlacklist = "^((?!^" + ('$|^'.join(names)) + \
-            "$)(?=[a-zA-Z0-9_-]+).)*$"
+        masterBlacklist = "^((?!^" + ("$|^".join(names)) + "$)(?=[a-zA-Z0-9_-]+).)*$"
         for i in portals:
             inames = names.copy()
-            iname = i['name']
+            iname = i["name"]
             inames.remove(iname)
-            blacklist = "^((?!^" + ('$|^'.join(inames)) + \
-                "$)(?=[a-zA-Z0-9_-]+).)*$"
+            blacklist = "^((?!^" + ("$|^".join(inames)) + "$)(?=[a-zA-Z0-9_-]+).)*$"
             blacklists.append(blacklist)
-    return templates.TemplateResponse('portals.html', {'request': request, 'portals': portals, 'masterBlacklist': masterBlacklist, 'blacklists': blacklists})
+    return render_template(
+        "portals.html",
+        portals=portals,
+        masterBlacklist=masterBlacklist,
+        blacklists=blacklists,
+    )
 
 
-@app.post("/portal/add")
-def add(request: Request, name: str = Form(...), url: str = Form(...), mac: str = Form(...), proxy: str = Form(""), format: str = Form(...)):
-    url = urlparse(url).scheme + "://" + urlparse(url).netloc
+@app.route("/portal/add", methods=["POST"])
+def portalsAdd():
+    name = request.form["name"]
+    url = stb.getUrl(request.form["url"])
+    mac = request.form["mac"]
+    proxy = request.form["proxy"]
+    format = request.form["format"]
     try:
-        response = session.get(url + "/c/")
+        portals = getPortals()
+        token = stb.getToken(url, mac)
+        expiry = stb.getExpires(url, mac, token)
+        portals.append(
+            {
+                "name": name,
+                "url": url,
+                "mac": mac,
+                "proxy": proxy,
+                "format": format,
+                "expires": expiry,
+                "enabled channels": [],
+                "custom channel names": {},
+                "custom genres": {},
+            }
+        )
+        savePortals(portals)
     except:
-        response = None
-    if response:
-        url = url + "/portal.php"
-    else:
-        url = url + "/stalker_portal/server/load.php"
-    portals = getPortals()
-    token = getToken(url, mac)
-    portals.append({"name": name, "url": url, "mac": mac, "proxy": proxy, "format": format, "expires": getExpires(
-        url, mac, token), "enabled channels": [], "custom channel names": {}, "custom genres": {}})
-    savePortals(portals)
-    return RedirectResponse('/portals', status_code=302)
+        print(sys.exc_info()[1])
+        pass
+    return redirect("/portals", code=302)
 
 
-@app.post("/portal/edit")
-def edit(request: Request, oname: str = Form(...), name: str = Form(...), url: str = Form(...), mac: str = Form(...), proxy: str = Form(""), format: str = Form(...)):
-    url = urlparse(url).scheme + "://" + urlparse(url).netloc
+@app.route("/portal/update", methods=["POST"])
+def portalUpdate():
+    name = request.form["name"]
+    oname = request.form["oname"]
+    url = stb.getUrl(request.form["url"])
+    mac = request.form["mac"]
+    proxy = request.form["proxy"]
+    format = request.form["format"]
     try:
-        response = session.get(url + "/c/")
+        portals = getPortals()
+        token = stb.getToken(url, mac)
+        expiry = stb.getExpires(url, mac, token)
+        for i in range(len(portals)):
+            if portals[i]["name"] == oname:
+                portals[i]["name"] = name
+                portals[i]["url"] = url
+                portals[i]["mac"] = mac
+                portals[i]["proxy"] = proxy
+                portals[i]["format"] = format
+                portals[i]["expires"] = expiry
+                savePortals(portals)
+                break
     except:
-        response = None
-    if response:
-        url = url + "/portal.php"
-    else:
-        url = url + "/stalker_portal/server/load.php"
-    portals = getPortals()
-    for i in range(len(portals)):
-        if portals[i]['name'] == oname:
-            portals[i]['name'] = name
-            portals[i]['url'] = url
-            portals[i]['mac'] = mac
-            portals[i]['proxy'] = proxy
-            portals[i]['format'] = format
-            portals[i]['expires'] = getExpires(url, mac, getToken(url, mac))
-            break
-    savePortals(portals)
-    return RedirectResponse('/portals', status_code=302)
+        print(sys.exc_info()[1])
+        pass
+    return redirect("/portals", code=302)
 
 
-@app.post("/portal/remove")
-def remove(request: Request, name: str = Form(...)):
+@app.route("/portal/remove", methods=["POST"])
+def portalRemove():
+    name = request.form["name"]
     portals = getPortals()
     for i in range(len(portals)):
         if portals[i]["name"] == name:
             portals.pop(i)
             break
     savePortals(portals)
-    return RedirectResponse('/portals', status_code=302)
+    return redirect("/portals", code=302)
 
 
-@app.get('/editor', response_class=HTMLResponse)
-def editor(request: Request):
+@app.route("/editor", methods=["GET"])
+def editor():
     channels = []
     portals = getPortals()
     if len(portals) > 0:
         for p in portals:
-            portalName = p['name']
-            url = p['url']
-            mac = p['mac']
-            token = getToken(url, mac)
-            enabledChannels = p['enabled channels']
-            customChannelNames = p['custom channel names']
-            customGenres = p['custom genres']
-            cookies = {'mac': mac, 'stb_lang': 'en',
-                       'timezone': 'Europe/London'}
-            headers = {
-                'User-Agent': 'Mozilla/5.0 (QtEmbedded; U; Linux; C)', 'Authorization': 'Bearer ' + token}
+            portalName = p["name"]
+            url = p["url"]
+            mac = p["mac"]
+            enabledChannels = p["enabled channels"]
+            customChannelNames = p["custom channel names"]
+            customGenres = p["custom genres"]
             try:
-                channelsData = session.post(
-                    url + '?type=itv&action=get_all_channels&force_ch_link_check=&JsHttpRequest=1-xml', cookies=cookies, headers=headers).json()['js']['data']
-                genresData = session.post(
-                    url + '?action=get_genres&type=itv&JsHttpRequest=1-xml', cookies=cookies, headers=headers).json()['js']
-                genres = {}
-                for i in genresData:
-                    gid = i['id']
-                    name = i['title']
-                    genres[gid] = name
-                for i in channelsData:
-                    channelId = i['id']
-                    channelName = i['name']
-                    genre = genres.get(i['tv_genre_id'])
+                token = stb.getToken(url, mac)
+                allChannels = stb.getAllChannels(url, mac, token)
+                genres = stb.getGenres(url, mac, token)
+                for i in allChannels:
+                    channelId = i["id"]
+                    channelName = i["name"]
+                    genre = genres.get(i["tv_genre_id"])
                     if channelId in enabledChannels:
                         enabled = True
                     else:
@@ -226,302 +175,278 @@ def editor(request: Request):
                     customGenre = customGenres.get(channelId)
                     if customGenre == None:
                         customGenre = ""
-                    channels.append({'enabled': enabled, 'channelName': channelName, 'customChannelName': customChannelName,
-                                    'genre': genre, 'customGenre': customGenre, 'channelId': channelId, 'portalName': portalName})
+                    channels.append(
+                        {
+                            "enabled": enabled,
+                            "channelName": channelName,
+                            "customChannelName": customChannelName,
+                            "genre": genre,
+                            "customGenre": customGenre,
+                            "channelId": channelId,
+                            "portalName": portalName,
+                        }
+                    )
             except:
-                print("Error getting channels for " + portalName)
-    return templates.TemplateResponse('editor.html', {'request': request, 'channels': channels})
+                print(sys.exc_info()[1])
+                pass
+    return render_template("editor.html", channels=channels)
 
 
-@app.post("/editor/save")
-def save(request: Request, enabledEdits: str = Form(...), nameEdits: str = Form(...), genreEdits: str = Form(...)):
-    enabledEdits = json.loads(enabledEdits)
-    nameEdits = json.loads(nameEdits)
-    genreEdits = json.loads(genreEdits)
+@app.route("/editor/save", methods=["POST"])
+def editorSave():
+    enabledEdits = json.loads(request.form["enabledEdits"])
+    nameEdits = json.loads(request.form["nameEdits"])
+    genreEdits = json.loads(request.form["genreEdits"])
     portals = getPortals()
     for e in enabledEdits:
-        portal = e['portal']
-        chid = e['channel id']
-        enabled = e['enabled']
+        portal = e["portal"]
+        chid = e["channel id"]
+        enabled = e["enabled"]
         for i, p in enumerate(portals):
-            if p['name'] == portal:
-                enabledChannels = p['enabled channels']
+            if p["name"] == portal:
+                enabledChannels = p["enabled channels"]
                 if enabled:
                     enabledChannels.append(chid)
                 else:
                     enabledChannels.remove(chid)
                 enabledChannels = list(set(enabledChannels))
-                portals[i]['enabled channels'] = enabledChannels
+                portals[i]["enabled channels"] = enabledChannels
                 break
     for n in nameEdits:
-        portal = n['portal']
-        chid = n['channel id']
-        customName = n['custom name']
+        portal = n["portal"]
+        chid = n["channel id"]
+        customName = n["custom name"]
         for i, p in enumerate(portals):
-            if p['name'] == portal:
-                customChannelNames = p['custom channel names']
+            if p["name"] == portal:
+                customChannelNames = p["custom channel names"]
                 if customName:
                     customChannelNames.update({chid: customName})
                 else:
                     customChannelNames.pop(chid)
-                portals[i]['custom channel names'] = customChannelNames
+                portals[i]["custom channel names"] = customChannelNames
                 break
     for g in genreEdits:
-        portal = g['portal']
-        chid = g['channel id']
-        customGenre = g['custom genre']
+        portal = g["portal"]
+        chid = g["channel id"]
+        customGenre = g["custom genre"]
         for i, p in enumerate(portals):
-            if p['name'] == portal:
-                customGenres = p['custom genres']
+            if p["name"] == portal:
+                customGenres = p["custom genres"]
                 if customGenre:
                     customGenres.update({chid: customGenre})
                 else:
                     customGenres.pop(chid)
-                portals[i]['custom genres'] = customGenres
+                portals[i]["custom genres"] = customGenres
                 break
     savePortals(portals)
-    return RedirectResponse('/editor', status_code=302)
+    return redirect("/editor", code=302)
 
 
-@app.get('/player', response_class=HTMLResponse)
-def player(request: Request):
+@app.route("/player", methods=["GET"])
+def player():
     channels = []
     for p in getPortals():
-        portalName = p['name']
-        url = p['url']
-        mac = p['mac']
-        token = getToken(url, mac)
-        enabledChannels = p['enabled channels']
-        customChannelNames = p['custom channel names']
-        customGenres = p['custom genres']
-        cookies = {'mac': mac, 'stb_lang': 'en', 'timezone': 'Europe/London'}
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (QtEmbedded; U; Linux; C)', 'Authorization': 'Bearer ' + token}
+        portalName = p["name"]
+        url = p["url"]
+        mac = p["mac"]
+        proxy = p["proxy"]
+        enabledChannels = p["enabled channels"]
+        customChannelNames = p["custom channel names"]
+        customGenres = p["custom genres"]
         if len(enabledChannels) != 0:
             try:
-                channelsData = session.post(
-                    url + '?type=itv&action=get_all_channels&force_ch_link_check=&JsHttpRequest=1-xml', cookies=cookies, headers=headers).json()['js']['data']
-                genresData = session.post(
-                    url + '?action=get_genres&type=itv&JsHttpRequest=1-xml', cookies=cookies, headers=headers).json()['js']
-                genres = {}
-                for i in genresData:
-                    gid = i['id']
-                    name = i['title']
-                    genres[gid] = name
-                for i in channelsData:
-                    channelId = i['id']
+                token = stb.getToken(url, mac)
+                allChannels = stb.getAllChannels(url, mac, token)
+                genres = stb.getGenres(url, mac, token)
+                for i in allChannels:
+                    channelId = i["id"]
                     if channelId in enabledChannels:
+                        cmd = i["cmd"]
                         channelName = customChannelNames.get(channelId)
                         if channelName == None:
-                            channelName = i['name']
+                            channelName = i["name"]
                         genre = customGenres.get(channelId)
                         if genre == None:
-                            genre = genres.get(i['tv_genre_id'])
-                        epg = session.post(url + '?type=itv&action=get_short_epg&ch_id=' + str(
-                            channelId) + '&size=10&JsHttpRequest=1-xml', cookies=cookies, headers=headers).json()['js']
+                            genre = genres.get(i["tv_genre_id"])
+                        epg = stb.getShortEpg(channelId, url, mac, token)
                         try:
-                            now = epg[0]['name']
+                            now = epg[0]["name"]
                         except:
                             now = "No data"
                         try:
-                            nex = epg[1]['name']
+                            nex = epg[1]["name"]
                         except:
                             nex = "No data"
-                        link = 'http://' + host + '/stream/' + \
-                            portalName + '/' + channelId + '?format=mp4'
+                        query = parse.urlencode(
+                            {
+                                "portalName": portalName,
+                                "url": url,
+                                "mac": mac,
+                                "cmd": cmd,
+                                "proxy": proxy,
+                                "format": "mp4",
+                            }
+                        )
+                        link = "http://" + host + "/play?" + query
                         channels.append(
-                            {"name": channelName, "genre": genre, "link": link, "now": now, "next": nex})
-                        channels.sort(key=lambda k: k['name'])
+                            {
+                                "name": channelName,
+                                "genre": genre,
+                                "link": link,
+                                "now": now,
+                                "next": nex,
+                            }
+                        )
+                        channels.sort(key=lambda k: k["name"])
             except:
-                print("Error getting channels for " + portalName)
-    return templates.TemplateResponse('player.html', {'request': request, 'channels': channels})
+                print(sys.exc_info()[1])
+                pass
+    return render_template("player.html", channels=channels)
 
 
-@app.get('/playlist')
+@app.route("/playlist", methods=["GET"])
 def playlist():
     channels = []
     for p in getPortals():
-        portalName = p['name']
-        url = p['url']
-        mac = p['mac']
-        proxy = p['proxy']
-        format = p['format']
-        token = getToken(url, mac)
-        enabledChannels = p['enabled channels']
-        customChannelNames = p['custom channel names']
-        customGenres = p['custom genres']
-        cookies = {'mac': mac, 'stb_lang': 'en', 'timezone': 'Europe/London'}
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (QtEmbedded; U; Linux; C)', 'Authorization': 'Bearer ' + token}
+        portalName = p["name"]
+        url = p["url"]
+        mac = p["mac"]
+        proxy = p["proxy"]
+        format = p["format"]
+        enabledChannels = p["enabled channels"]
+        customChannelNames = p["custom channel names"]
+        customGenres = p["custom genres"]
         if len(enabledChannels) != 0:
             try:
-                channelsData = session.post(
-                    url + '?type=itv&action=get_all_channels&force_ch_link_check=&JsHttpRequest=1-xml', cookies=cookies, headers=headers).json()['js']['data']
-                genresData = session.post(
-                    url + '?action=get_genres&type=itv&JsHttpRequest=1-xml', cookies=cookies, headers=headers).json()['js']
-                genres = {}
-                for i in genresData:
-                    gid = i['id']
-                    name = i['title']
-                    genres[gid] = name
-                for i in channelsData:
-                    channelId = i['id']
+                token = stb.getToken(url, mac)
+                allChannels = stb.getAllChannels(url, mac, token)
+                genres = stb.getGenres(url, mac, token)
+                for i in allChannels:
+                    channelId = i["id"]
                     if channelId in enabledChannels:
+                        cmd = i["cmd"]
                         channelName = customChannelNames.get(channelId)
                         if channelName == None:
-                            channelName = i['name']
+                            channelName = i["name"]
                         genre = customGenres.get(channelId)
                         if genre == None:
-                            genre = genres.get(i['tv_genre_id'])
-                        if format != "redirect" or proxy:
-                            method = "stream"
-                            f = "?format=" + format
-                        else:
-                            method = "channel"
-                            f = ""
-                        channels.append('#EXTINF:-1 group-title="' + genre + '",' + channelName +
-                                        '\n' + 'http://' + host + "/" + method + "/" + portalName + "/" + channelId + f)
+                            genre = genres.get(i["tv_genre_id"])
+                        query = parse.urlencode(
+                            {
+                                "portalName": portalName,
+                                "url": url,
+                                "mac": mac,
+                                "cmd": cmd,
+                                "proxy": proxy,
+                                "format": format,
+                            }
+                        )
+                        channels.append(
+                            '#EXTINF:-1 group-title="'
+                            + genre
+                            + '",'
+                            + channelName
+                            + "\n"
+                            + "http://"
+                            + host
+                            + "/play?"
+                            + query
+                        )
             except:
-                print("Error getting playlist for " + portalName)
-    channels.sort(key=lambda k: k.split(',')[1])
-    playlist = '#EXTM3U \n'
+                print(sys.exc_info()[1])
+                pass
+    channels.sort(key=lambda k: k.split(",")[1])
+    playlist = "#EXTM3U \n"
     playlist = playlist + "\n".join(channels)
-    return PlainTextResponse(playlist)
+    return Response(playlist, mimetype="text/plain")
 
 
-@app.get('/xmltv')
-def xmltv():
-    for p in getPortals():
-        portalName = p['name']
-        url = p['url']
-        mac = p['mac']
-        token = getToken(url, mac)
-        enabledChannels = p['enabled channels']
-        customChannelNames = p['custom channel names']
-        customGenres = p['custom genres']
-        if len(enabledChannels) != 0:
-            try:
-                cookies = {'mac': mac, 'stb_lang': 'en',
-                           'timezone': 'Europe/London'}
-                headers = {
-                    'User-Agent': 'Mozilla/5.0 (QtEmbedded; U; Linux; C)', 'Authorization': 'Bearer ' + token}
-
-                epgData = session.post(url + '?type=itv&action=get_epg_info&period=24&JsHttpRequest=1-xml',
-                                       cookies=cookies, headers=headers).json()['js']['data']
-                listings = []
-                for chid in enabledChannels:
-                    entries = epgData.get(chid)
-                    if entries:
-                        for entry in entries:
-                            name = entry.get('name')
-                            desc = entry.get('descr')
-                            start = datetime.datetime.fromtimestamp(
-                                int(entry.get('start_timestamp'))).strftime('%Y%m%d%H%M%S')
-                            end = datetime.datetime.fromtimestamp(
-                                int(entry.get('stop_timestamp'))).strftime('%Y%m%d%H%M%S')
-                            listings.append(
-                                {'channel': portalName + '_' + chid, 'name': name, 'desc': desc, 'start': start, 'end': end})
-                print(listings)
-            except:
-                print("Error getting epg")
-
-
-@app.get('/channel/{portalName}/{channelId}')
-def channel(portalName, channelId):
-    for p in getPortals():
-        if p['name'] == portalName:
-            url = p['url']
-            mac = p['mac']
-            break
-    token = getToken(url, mac)
-    cookies = {'mac': mac, 'stb_lang': 'en', 'timezone': 'Europe/London'}
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (QtEmbedded; U; Linux; C)', 'Authorization': 'Bearer ' + token}
-    try:
-        response = session.post(url + '?type=itv&action=create_link&cmd=http://localhost/ch/' + str(
-            channelId) + '&JsHttpRequest=1-xml', cookies=cookies, headers=headers)
-        data = response.json()
-        link = data['js']['cmd'].split()[-1]
-    except:
-        print("Error getting link for " + portalName + "/" + channelId)
-    return RedirectResponse(link)
-
-
-@app.get('/stream/{portalName}/{channelId}')
-def stream(portalName, channelId, format: str = "mp4"):
+@app.route("/play", methods=["GET"])
+def channel():
     def streamData(link, proxy, format):
         if format == "mp4":
             ffmpegcmd = [
-                'ffmpeg',
-                '-re',
-                '-loglevel', 'panic', '-hide_banner',
-                '-i', link,
-                '-vcodec', 'copy',
-                '-f', 'mp4',
-                '-movflags', 'frag_keyframe+empty_moov',
-                '-reconnect_at_eof', '1',
-                '-reconnect_streamed', '1',
-                '-reconnect_on_network_error', '1',
-                '-reconnect_on_http_error', '4xx,5xx',
-                'pipe:'
+                "ffmpeg",
+                "-re",
+                "-loglevel",
+                "panic",
+                "-hide_banner",
+                "-i",
+                link,
+                "-vcodec",
+                "copy",
+                "-f",
+                "mp4",
+                "-movflags",
+                "frag_keyframe+empty_moov",
+                "pipe:",
             ]
         elif format == "mpegts":
             ffmpegcmd = [
-                'ffmpeg',
-                '-re',
-                '-loglevel', 'panic', '-hide_banner',
-                '-i', link,
-                '-c', 'copy',
-                '-f', 'mpegts',
-                '-reconnect_at_eof', '1',
-                '-reconnect_streamed', '1',
-                '-reconnect_on_network_error', '1',
-                '-reconnect_on_http_error', '4xx,5xx',
-                'pipe:'
+                "ffmpeg",
+                "-re",
+                "-loglevel",
+                "panic",
+                "-hide_banner",
+                "-i",
+                link,
+                "-c",
+                "copy",
+                "-f",
+                "mpegts",
+                "pipe:",
             ]
         elif format == "hls":
             ffmpegcmd = [
-                'ffmpeg',
-                '-re',
-                '-loglevel', 'panic', '-hide_banner',
-                '-i', link,
-                '-c', 'copy',
-                '-f', 'hls',
-                '-reconnect_at_eof', '1',
-                '-reconnect_streamed', '1',
-                '-reconnect_on_network_error', '1',
-                '-reconnect_on_http_error', '4xx,5xx',
-                'pipe:'
+                "ffmpeg",
+                "-re",
+                "-loglevel",
+                "panic",
+                "-hide_banner",
+                "-i",
+                link,
+                "-c",
+                "copy",
+                "-f",
+                "hls",
+                "pipe:",
             ]
 
         if proxy:
-            ffmpegcmd.insert(5, '-http_proxy')
+            ffmpegcmd.insert(5, "-http_proxy")
             ffmpegcmd.insert(6, proxy)
 
-        with subprocess.Popen(ffmpegcmd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE) as ffmpeg_sb:
-            yield from iter(ffmpeg_sb.stdout.readline, "")
-        print("hello")
+        try:
+            ffmpeg_sb = subprocess.Popen(
+                ffmpegcmd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE
+            )
+            for stdout_line in iter(ffmpeg_sb.stdout.readline, ""):
+                yield stdout_line
+        finally:
+            ffmpeg_sb.terminate()
 
-    for p in getPortals():
-        if p['name'] == portalName:
-            url = p['url']
-            mac = p['mac']
-            proxy = p.get('proxy')
-            break
-    token = getToken(url, mac)
-    cookies = {'mac': mac, 'stb_lang': 'en', 'timezone': 'Europe/London'}
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (QtEmbedded; U; Linux; C)', 'Authorization': 'Bearer ' + token}
-    try:
-        response = session.post(url + '?type=itv&action=create_link&cmd=http://localhost/ch/' + str(
-            channelId) + '&JsHttpRequest=1-xml', cookies=cookies, headers=headers)
-        data = response.json()
-        link = data['js']['cmd'].split()[-1]
-    except:
-        print("Error getting link (stream) for " + portalName + "/" + channelId)
-    return StreamingResponse(streamData(link, proxy, format))
+    url = request.args.get("url")
+    mac = request.args.get("mac")
+    cmd = request.args.get("cmd")
+    proxy = request.args.get("proxy")
+    format = request.args.get("format")
+    if format == "redirect":
+        try:
+            token = stb.getToken(url, mac)
+            link = stb.getLink(url, mac, token, cmd)
+            return redirect(link, code=302)
+        except:
+            print(sys.exc_info()[1])
+            pass
+    else:
+        try:
+            token = stb.getToken(url, mac)
+            link = stb.getLink(url, mac, token, cmd)
+            return Response(streamData(link, proxy, format))
+        except:
+            print(sys.exc_info()[1])
+            pass
 
 
 if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8001, log_level="debug")
+    app.run(host="0.0.0.0", port=8001, debug=True)

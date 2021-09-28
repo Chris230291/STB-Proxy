@@ -40,7 +40,7 @@
         {% if portals is not none %}
         {% for portal in portals %}
         <tr>
-            <form action="/portal/edit" method="post" name="hi">
+            <form action="/portal/update" method="post">
                 <td>
                     <input type="text" name="oname" class="textfield" value="{{ portal['name'] }}" hidden>
                     <input type="text" name="name" class="textfield" required pattern="{{ blacklists[loop.index0] }}"
@@ -63,7 +63,7 @@
                     </select></td>
                 <td>{{ portal['expires'] }}</td>
                 <td>
-                    <input type="submit" class="buttonEditPortal" value="Edit">
+                    <input type="submit" class="buttonEditPortal" value="Update">
                 </td>
             </form>
             <td>

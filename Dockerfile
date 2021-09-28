@@ -9,15 +9,12 @@ RUN apk add \
 	ffmpeg
 
 RUN pip3 install \
-	fastapi \
-	requests \
-	uvicorn \
-	jinja2 \
-	python-multipart \
-	aiofiles
+	flask \
+	requests
 
 # Copy files
 COPY /app.py /app/app.py
+COPY /stb.py /app/stb.py
 COPY /templates /app/templates
 COPY /static /app/static
 
