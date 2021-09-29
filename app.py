@@ -433,7 +433,10 @@ def channel():
     if format == "redirect":
         try:
             token = stb.getToken(url, mac)
-            link = stb.getLink(url, mac, token, cmd)
+            if "http://localhost/" in cmd: 
+                link = stb.getLink(url, mac, token, cmd)
+            else:
+                link = cmd.split(" ")[1]
             return redirect(link, code=302)
         except:
             print(sys.exc_info()[1])
@@ -441,7 +444,10 @@ def channel():
     else:
         try:
             token = stb.getToken(url, mac)
-            link = stb.getLink(url, mac, token, cmd)
+            if "http://localhost/" in cmd: 
+                link = stb.getLink(url, mac, token, cmd)
+            else:
+                link = cmd.split(" ")[1]
             return Response(streamData(link, proxy, format))
         except:
             print(sys.exc_info()[1])
