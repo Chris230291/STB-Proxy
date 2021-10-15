@@ -456,7 +456,6 @@ def channel(portal, channel):
 
     if format == "redirect":
         try:
-            token = stb.getToken(url, mac)
             if "http://localhost/" in cmd:
                 link = stb.getLink(url, mac, token, cmd)
             else:
@@ -467,7 +466,6 @@ def channel(portal, channel):
             pass
     else:
         try:
-            token = stb.getToken(url, mac)
             if "http://localhost/" in cmd:
                 link = stb.getLink(url, mac, token, cmd)
             else:
