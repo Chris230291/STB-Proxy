@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+{% block content %}
+<div class=".container-fluid table-responsive m-lg-5">
+    <table id="table" class="table table-striped table-dark nowrap" style="display:none; width:100%">
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>URL</th>
+                <th>MAC</th>
+                <th>Proxy</th>
+                <th>Format</th>
+                <th>Exipres</th>
+                <th></th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% if portals is not none %}
+            {% for portal in portals %}
+            <tr class="align-middle">
+                <td>
+                    <form id="{{ portal }}" action="/portal/update" method="post">
+                        <input type="text" name="id" value="{{ portal }}" hidden>
+                        <input type="text" name="name" class="form-control" style="min-width: 200px;" required
+                            value="{{ portals[portal].name }}">
+                    </form>
+                    <form id="removeForm" action="/portal/remove" method="post">
+                    </form>
+                </td>
+                <td>
+                    <input form="{{ portal }}" type="text" name="url" class="form-control" style="min-width: 200px;"
+                        required pattern="^(http|https):\/\/.*$" title="Enter a valid URL starting with 'http|s://'"
+                        value="{{ portals[portal].url }}">
+                </td>
+                <td>
+                    <input form="{{ portal }}" type="text" name="mac" class="form-control" style="min-width: 160px;"
+                        required pattern="^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$" title="Enter a valid MAC address"
+                        value="{{ portals[portal].mac }}">
+                </td>
+                <td>
+                    <input form="{{ portal }}" type="text" name="proxy" class="form-control" style="min-width: 200px;"
+                        onchange="setFormat(this)" pattern="^(http|https):\/\/.*$"
+                        title="Enter a valid URL starting with 'http|s://'" value="{{ portals[portal].proxy }}">
+                </td>
+                <td>
+                    <select form="{{ portal }}" name="format" data-format="{{ portals[portal].format }}"
+                        class="form-select">
+                        <option value="redirect">Redirect</option>
+                        <option value="mp4">MP4</option>
+                        <option value="hls">HLS</option>
+                        <option value="mpegts">MPEG-TS</option>
+                    </select>
+                </td>
+                <td>{{ portals[portal].expires }}</td>
+                <td>
+                    <button form="{{ portal }}" class="btn btn-success btn-block" title="Save"><i
+                            class="fa fa-save"></i></button>
+                </td>
+                <td>
+                    <button form="removeForm" name="id" class="btn btn-danger btn-block" title="Delete"
+                        value="{{ portal }}"><i class="fa fa-trash"></i></button>
+                </td>
+            </tr>
+            {% endfor %}
+            {% endif %}
+            <tr class="align-middle">
+                <td>
+                    <form id="addForm" action="/portal/add" method="post">
+                        <input type="text" name="name" class="form-control" style="min-width: 200px;" required>
+                    </form>
+                </td>
+                <td>
+                    <input form="addForm" type="text" name="url" class="form-control" style="min-width: 200px;" required
+                        pattern="^(http|https):\/\/.*$" title="Enter a valid URL starting with 'http|s://'">
+                </td>
+                <td>
+                    <input form="addForm" type="text" name="mac" class="form-control" style="min-width: 160px;" required
+                        pattern="^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$" title="Enter a valid MAC address">
+                </td>
+                <td>
+                    <input form="addForm" type="text" name="proxy" class="form-control" style="min-width: 200px;"
+                        onchange="setFormat(this)" pattern="^(http|https):\/\/.*$"
+                        title="Enter a valid URL starting with 'http|s://'">
+                </td>
+                <td>
+                    <select form="addForm" name="format" data-format="redirect" class="form-select"
+                        style="min-width: 120px;">
+                        <option value="redirect">Redirect</option>
+                        <option value="mp4">MP4</option>
+                        <option value="hls">HLS</option>
+                        <option value="mpegts">MPEG-TS</option>
+                    </select>
+                </td>
+                <td></td>
+                <td></td>
+                <td>
+                    <button form="addForm" class="btn btn-success btn-block" title="Add"><i
+                            class="fa fa-plus"></i></button>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+<script>
+
+    var formatLists = document.getElementsByName("format")
+    for (var i = 0; i < formatLists.length; i++) {
+        formatLists[i].value = formatLists[i].getAttribute('data-format');
+        setFormat(formatLists[i]);
+    }
+
+    function setFormat(ele) {
+        var row = ele.parentElement.parentElement;
+        var proxy = row.querySelector('input[name="proxy"]').value;
+        var format = row.querySelector('select[name="format"]');
+        if (proxy !== "") {
+            format.options[0].disabled = true;
+            if (format.value == "redirect" || format.value == "") {
+                format.value = "mp4";
+            }
+        }
+        else
+            format.options[0].disabled = false;
+    }
+
+    $(document).ready(function () {
+        var table = $('#table').DataTable({
+            dom: "<'row'<'col-12'tr>>",
+            ordering: false,
+            paging: false,
+            bFilter: false,
+            bInfo: false,
+        });
+        $('#table').show();
+    });
+</script>
+{% endblock %}

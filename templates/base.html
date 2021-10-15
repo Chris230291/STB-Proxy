@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>STB Proxy</title>
+    <link rel="shortcut icon" type="image/png" href="../static/tv.png" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+    <link rel="stylesheet" type="text/css"
+        href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/5.0.1/css/bootstrap.min.css" />
+    <link rel="stylesheet" type="text/css"
+        href="https://cdn.datatables.net/v/bs5/jq-3.6.0/dt-1.11.3/b-2.0.1/datatables.min.css" />
+    <script type="text/javascript"
+        src="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/5.0.1/js/bootstrap.bundle.min.js"></script>
+    <script type="text/javascript"
+        src="https://cdn.datatables.net/v/bs5/jq-3.6.0/dt-1.11.3/b-2.0.1/datatables.min.js"></script>
+</head>
+
+<body class="bg-dark">
+    <nav class="navbar navbar-expand-lg navbar-light bg-light m-lg-5">
+        <div class="container-fluid">
+            <a class="navbar-brand">
+                <img src="../static/tv.png" alt="" width="24" class="d-inline-block align-text-top">
+                STB Proxy
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse"
+                data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false"
+                aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarSupportedContent">
+                <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/portals"><i class="fa fa-server"></i> Portals</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/editor"><i class="fa fa-list"></i> Playlist Editor</a>
+                    </li>
+                    <!--li class="nav-item">
+                        <a class="nav-link" href="/player"><i class="fa fa-film"></i> Player</a>
+                    </li-->
+                    <li class="nav-item">
+                        <a class="nav-link" target="_blank" href="/playlist"><i class="fa fa-file-video-o"></i> M3U</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" target="_blank" href="/xmltv"><i class="fa fa-file-code-o"></i> XMLTV</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    {% block content %}{% endblock %}
+
+</body>
+
+</html>
