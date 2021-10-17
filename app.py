@@ -188,7 +188,7 @@ def editor():
                             + "/play/"
                             + portal
                             + "/"
-                            + channelId
+                            + str(channelId)
                             + "?format=mp4",
                         }
                     )
@@ -349,7 +349,7 @@ def playlist():
                             + ' tvg-id="'
                             + epgId
                             + '" tvg-chno="'
-                            + channelNumber
+                            + str(channelNumber)
                             + '" group-title="'
                             + genre
                             + '",'
@@ -360,7 +360,7 @@ def playlist():
                             + "/play/"
                             + portal
                             + "/"
-                            + channelId
+                            + str(channelId)
                         )
             except:
                 print("Error making playlist for " + name)
