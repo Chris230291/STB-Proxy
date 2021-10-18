@@ -35,4 +35,4 @@ chris230291/stb-proxy:latest
 
 # Note
 
-I am not a programmer. Most of the stuff envolved with getting this working (excluding some basic python knowledge) I learnt while putting this app together. If you see any room for improvement please make suggestions and/or pull requests.
+I am not a programmer. Most of the stuff involved with getting this working (excluding some basic python knowledge) I learnt while putting this app together. If you see any room for improvement please make suggestions and/or pull requests.
