@@ -32,3 +32,7 @@ chris230291/stb-proxy:latest
 - Download the repo
 - Doubble click `app.py`
 - Go to `http://localhost:8001` in a browser and enter Portal URL + MAC
+
+# Note
+
+I am not s programmer. Most of the stuff envolved with getting this working (excluding some basic python knowledge) I learnt while putting this app together. If you see any room for improvement please make suggestions and/or pull requests.
