@@ -1,6 +1,7 @@
 # STB-Proxy
 
 - Play STB portal streams in regular m3u media players
+- Responds as HD Homerun for Plex etc
 - Configuration through web UI
 - Combine multiple portals
 - Enable/disable channels individually
@@ -8,6 +9,7 @@
 - Set custom genres
 - Modify channel numbers
 - Override epg
+- Set fallback channels
 
 # Docker
 - Map whichever port you like to the default `8001`
