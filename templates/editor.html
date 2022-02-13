@@ -15,6 +15,7 @@
                 <th>Genre</th>
                 <th>Number</th>
                 <th>EPG ID</th>
+                <th>Fallback For</th>
                 <th>Portal</th>
             </tr>
         </thead>
@@ -44,22 +45,34 @@
                         data-customChannelName="{{ channel['customChannelName'] }}" data-link="{{ channel['link'] }}"><i
                             class="fa fa-play"></i></button>
                 </td>
-                <td><input type="text" class="form-control" style="min-width: 200px;" onchange="editCustomName(this)"
+                <td>
+                    <input type="text" class="form-control" style="min-width: 200px;" onchange="editCustomName(this)"
                         data-portal="{{ channel['portal'] }}" data-channelId="{{ channel['channelId'] }}"
                         placeholder="{{ channel['channelName'] }}" title="{{ channel['channelName'] }}"
-                        value="{{ channel['customChannelName'] }}"></td>
-                <td><input type="text" class="form-control" style="min-width: 200px;" onchange="editCustomGenre(this)"
+                        value="{{ channel['customChannelName'] }}">
+                </td>
+                <td>
+                    <input type="text" class="form-control" style="min-width: 200px;" onchange="editCustomGenre(this)"
                         data-portal="{{ channel['portal'] }}" data-channelId="{{ channel['channelId'] }}"
                         placeholder="{{ channel['genre'] }}" title="{{ channel['genre'] }}"
-                        value="{{ channel['customGenre'] }}"></td>
-                <td><input type="number" class="form-control" style="min-width: 100px;"
+                        value="{{ channel['customGenre'] }}">
+                </td>
+                <td>
+                    <input type="number" class="form-control" style="min-width: 100px;"
                         onchange="editCustomNumber(this)" data-portal="{{ channel['portal'] }}"
                         data-channelId="{{ channel['channelId'] }}" placeholder="{{ channel['channelNumber'] }}"
-                        title="{{ channel['channelNumber'] }}" value="{{ channel['customChannelNumber'] }}"></td>
-                <td><input type="text" class="form-control" style="min-width: 200px;" onchange="editCustomEpgId(this)"
+                        title="{{ channel['channelNumber'] }}" value="{{ channel['customChannelNumber'] }}">
+                </td>
+                <td>
+                    <input type="text" class="form-control" style="min-width: 200px;" onchange="editCustomEpgId(this)"
                         data-portal="{{ channel['portal'] }}" data-channelId="{{ channel['channelId'] }}"
                         placeholder="{{ channel['portal'] }}{{ channel['channelId'] }}"
                         title="{{ channel['portal'] }}{{ channel['channelId'] }}" value="{{ channel['customEpgId'] }}">
+                </td>
+                <td>
+                    <input type="text" class="form-control" style="min-width: 200px;" onchange="editFallback(this)"
+                        data-portal="{{ channel['portal'] }}" data-channelId="{{ channel['channelId'] }}"
+                        value="{{ channel['fallbackChannel'] }}">
                 </td>
                 <td style="min-width: 200px;">{{ channel['portalName'] }}</td>
             </tr>
@@ -74,6 +87,7 @@
         <input type="text" id="nameEdits" name="nameEdits" value="">
         <input type="text" id="genreEdits" name="genreEdits" value="">
         <input type="text" id="epgEdits" name="epgEdits" value="">
+        <input type="text" id="fallbackEdits" name="fallbackEdits" value="">
     </form>
 
     <!-- Modal -->
@@ -101,6 +115,7 @@
     var nameEdits = [];
     var genreEdits = [];
     var epgEdits = [];
+    var fallbackEdits = [];
 
     function editAll(ele) {
         checkboxes = document.getElementsByClassName('checkbox');
@@ -150,12 +165,21 @@
         epgEdits.push(j);
     }
 
+    function editFallback(ele) {
+        var p = ele.getAttribute('data-portal');
+        var i = ele.getAttribute('data-channelId');
+        var c = ele.value;
+        var j = { "portal": p, "channel id": i, "channel name": c };
+        fallbackEdits.push(j);
+    }
+
     function save() {
         document.getElementById("enabledEdits").value = JSON.stringify(enabledEdits);
         document.getElementById("numberEdits").value = JSON.stringify(numberEdits);
         document.getElementById("nameEdits").value = JSON.stringify(nameEdits);
         document.getElementById("genreEdits").value = JSON.stringify(genreEdits);
         document.getElementById("epgEdits").value = JSON.stringify(epgEdits);
+        document.getElementById("fallbackEdits").value = JSON.stringify(fallbackEdits);
         document.getElementById("save edits").submit();
     }
 
@@ -207,6 +231,7 @@
                 { targets: 3, orderDataType: "dom-text", type: 'string' },
                 { targets: 4, orderDataType: "dom-text", type: 'string' },
                 { targets: 5, orderDataType: "dom-text", type: 'string' },
+                { targets: 6, orderDataType: "dom-text", type: 'string' }
             ],
             language: {
                 search: "",
@@ -218,7 +243,7 @@
                     {
                         text: '<i class="fa fa-save"></i>',
                         titleAttr: 'Save',
-                        className: "btn btn-success",
+                        className: "btn btn-success m-1",
                         action: function () {
                             save();
                         }

@@ -4,11 +4,12 @@
     <table id="table" class="table table-striped table-dark nowrap" style="display:none; width:100%">
         <thead>
             <tr>
+                <th>Enabled</th>
                 <th>Name</th>
                 <th>URL</th>
                 <th>MAC</th>
                 <th>Proxy</th>
-                <th>Format</th>
+                <th>FFmpeg</th>
                 <th>Exipres</th>
                 <th></th>
                 <th></th>
@@ -19,7 +20,15 @@
             {% for portal in portals %}
             <tr class="align-middle">
                 <td>
+                    <div class="form-check form-switch">
+                        <input type="checkbox" class="checkbox form-check-input" onchange="editEnabled(this)"
+                            data-portal="{{ portal }}" {{ "checked" if portals[portal].enabled=="true" }}>
+                    </div>
+                </td>
+                <td>
                     <form id="{{ portal }}" action="/portal/update" method="post">
+                        <input type="text" name="enabled" value="{{ portals[portal].enabled }}" hidden>
+                        <input type="text" name="ffmpeg" value="{{ portals[portal].ffmpeg }}" hidden>
                         <input type="text" name="id" value="{{ portal }}" hidden>
                         <input type="text" name="name" class="form-control" style="min-width: 200px;" required
                             value="{{ portals[portal].name }}">
@@ -39,17 +48,16 @@
                 </td>
                 <td>
                     <input form="{{ portal }}" type="text" name="proxy" class="form-control" style="min-width: 200px;"
-                        onchange="setFormat(this)" pattern="^(http|https):\/\/.*$"
+                        onchange="editProxy(this)" pattern="^(http|https):\/\/.*$"
                         title="Enter a valid URL starting with 'http|s://'" value="{{ portals[portal].proxy }}">
                 </td>
                 <td>
-                    <select form="{{ portal }}" name="format" data-format="{{ portals[portal].format }}"
-                        class="form-select">
-                        <option value="redirect">Redirect</option>
-                        <option value="mp4">MP4</option>
-                        <option value="hls">HLS</option>
-                        <option value="mpegts">MPEG-TS</option>
-                    </select>
+                    <div class="form-check form-switch">
+                        <input type="checkbox" name="ffmpegCheck" class="checkbox form-check-input"
+                            onchange="editFFmpeg(this)" data-portal="{{ portal }}" {{ "checked" if
+                            portals[portal].ffmpeg=="true" or portals[portal].proxy!="" }} {{ "disabled" if
+                            portals[portal].proxy!="" }}>
+                    </div>
                 </td>
                 <td>{{ portals[portal].expires }}</td>
                 <td>
@@ -65,7 +73,15 @@
             {% endif %}
             <tr class="align-middle">
                 <td>
+                    <div class="form-check form-switch">
+                        <input type="checkbox" class="checkbox form-check-input" onchange="editEnabled(this)"
+                            data-portal="addForm" checked>
+                    </div>
+                </td>
+                <td>
                     <form id="addForm" action="/portal/add" method="post">
+                        <input type="text" name="enabled" value="true" hidden>
+                        <input type="text" name="ffmpeg" value="false" hidden>
                         <input type="text" name="name" class="form-control" style="min-width: 200px;" required>
                     </form>
                 </td>
@@ -79,17 +95,14 @@
                 </td>
                 <td>
                     <input form="addForm" type="text" name="proxy" class="form-control" style="min-width: 200px;"
-                        onchange="setFormat(this)" pattern="^(http|https):\/\/.*$"
+                        onchange="editProxy(this)" pattern="^(http|https):\/\/.*$"
                         title="Enter a valid URL starting with 'http|s://'">
                 </td>
                 <td>
-                    <select form="addForm" name="format" data-format="redirect" class="form-select"
-                        style="min-width: 120px;">
-                        <option value="redirect">Redirect</option>
-                        <option value="mp4">MP4</option>
-                        <option value="hls">HLS</option>
-                        <option value="mpegts">MPEG-TS</option>
-                    </select>
+                    <div class="form-check form-switch">
+                        <input type="checkbox" name="ffmpegCheck" class="checkbox form-check-input"
+                            data-portal="addForm">
+                    </div>
                 </td>
                 <td></td>
                 <td></td>
@@ -104,24 +117,32 @@
 
 <script>
 
-    var formatLists = document.getElementsByName("format")
-    for (var i = 0; i < formatLists.length; i++) {
-        formatLists[i].value = formatLists[i].getAttribute('data-format');
-        setFormat(formatLists[i]);
+    function editEnabled(ele) {
+        var c = ele.checked;
+        var portal = ele.getAttribute('data-portal');
+        var form = document.forms[portal];
+        form.elements.enabled.value = c;
     }
 
-    function setFormat(ele) {
+    function editFFmpeg(ele) {
+        var c = ele.checked;
+        var portal = ele.getAttribute('data-portal');
+        var form = document.forms[portal];
+        form.elements.ffmpeg.value = c;
+    }
+
+    function editProxy(ele) {
         var row = ele.parentElement.parentElement;
         var proxy = row.querySelector('input[name="proxy"]').value;
-        var format = row.querySelector('select[name="format"]');
+        var ffmpeg = row.querySelector('input[name="ffmpeg"]');
+        var ffmpegCheck = row.querySelector('input[name="ffmpegCheck"]');
         if (proxy !== "") {
-            format.options[0].disabled = true;
-            if (format.value == "redirect" || format.value == "") {
-                format.value = "mp4";
-            }
+            ffmpegCheck.checked = true
+            ffmpegCheck.disabled = true;
+            ffmpeg.value = "true"
         }
         else
-            format.options[0].disabled = false;
+            ffmpegCheck.disabled = false;
     }
 
     $(document).ready(function () {

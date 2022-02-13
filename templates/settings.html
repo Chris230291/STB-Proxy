@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% block content %}
+<div class=".container-fluid table-responsive m-lg-5">
+
+    <form id="save" action="/settings/save" method="post"></form>
+
+    <div class="m-2">
+        <button form="save" class="btn btn-success btn-block" title="Save"><i class="fa fa-save"></i></button>
+    </div>
+
+    <table id="table" class="table table-striped table-dark nowrap" style="width:fill">
+        <thead>
+            <tr>
+                <th>Option</th>
+                <th>Value</th>
+                <th>Reset</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <th scope="row" class="align-middle" style="width:0%; white-space:nowrap">FFmpeg Command:</th>
+                <td>
+                    <div class="input-group flex-nowrap">
+                        <span class="input-group-text">ffmpeg -loglevel panic -hide_banner -http_proxy *proxy* -i
+                            *link*</span>
+                        <input form="save" type="text" name="ffmpeg command" id="ffmpeg command" class="form-control"
+                            value="{{ settings['ffmpeg command'] }}" title="Edit the FFmpeg command. See FFmpeg documentation for help." required>
+                        <span class="input-group-text">pipe:</span>
+                    </div>
+                </td>
+                <td>
+                    <button class="btn btn-danger btn-block" title="Reset"><i class="fa fa-undo"
+                            onclick="resetFfmpeg()"></i></button>
+                </td>
+            </tr>
+            <tr>
+                <th scope="row" class="align-middle" style="width:0%; white-space:nowrap">Test Timeout:</th>
+                <td>
+                    <input form="save" type="number" name="ffprobe timeout" id="ffprobe timeout" class="form-control"
+                        value="{{ settings['ffprobe timeout'] }}" title="Time to wait for a stream before giving up in seconds." required>
+                </td>
+                <td>
+                    <button class="btn btn-danger btn-block" title="Reset"><i class="fa fa-undo"
+                            onclick="resetFfprobe()"></i></button>
+                </td>
+            </tr>
+            <tr>
+                <th scope="row" class="align-middle" style="width:0%; white-space:nowrap">HDHR Name:</th>
+                <td>
+                    <input form="save" type="text" name="hdhr name" id="hdhr name" class="form-control"
+                        value="{{ settings['hdhr name'] }}" title="Display name of server in Plex DVR etc." required>
+                </td>
+                <td>
+                    <button class="btn btn-danger btn-block" title="Reset"><i class="fa fa-undo"
+                            onclick="resetHdhrName()"></i></button>
+                </td>
+            </tr>
+            <tr>
+                <th scope="row" class="align-middle" style="width:0%; white-space:nowrap">HDHR Tuners:</th>
+                <td>
+                    <input form="save" type="number" name="hdhr tuners" id="hdhr tuners" class="form-control"
+                        value="{{ settings['hdhr tuners'] }}" title="Max concurrent streams in Plex etc." required>
+                </td>
+                <td>
+                    <button class="btn btn-danger btn-block" title="Reset"><i class="fa fa-undo"
+                            onclick="resetHdhrTuners()"></i></button>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+<script>
+    function resetFfmpeg() {
+        document.getElementById("ffmpeg command").value = "-vcodec copy -acodec copy -f mpegts";
+    }
+
+    function resetFfprobe() {
+        document.getElementById("ffprobe timeout").value = "5";
+    }
+
+    function resetHdhrName() {
+        document.getElementById("hdhr name").value = "STB-Proxy";
+    }
+
+    function resetHdhrTuners() {
+        document.getElementById("hdhr tuners").value = "1";
+    }
+</script>
+
+{% endblock %}
