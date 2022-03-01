@@ -260,7 +260,8 @@ def editorSave():
         if enabled:
             portals[portal]["enabled channels"].append(channelId)
         else:
-            portals[portal]["enabled channels"].remove(channelId)
+            #portals[portal]["enabled channels"].remove(channelId)
+            portals[portal]["enabled channels"] = list(filter((channelId).__ne__, portals[portal]["enabled channels"]))
 
     for edit in numberEdits:
         portal = edit["portal"]
