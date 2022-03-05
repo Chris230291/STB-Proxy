@@ -1,0 +1,7 @@
+#Specifying a version is recommended but for now i let it like this since it works ! 
+flask
+requests
+retrying
+ffmpeg
+pyjwt
+bcrypt

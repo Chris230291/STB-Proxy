@@ -1,27 +1,30 @@
 import stb
-from flask import Flask, render_template, redirect, request, Response
+from flask import Flask, render_template, redirect, request, Response, flash, url_for, make_response
 from pathlib import Path
-import os
-import sys
-import json
-import subprocess
-import uuid
+import os, time, jwt, random, sys, json, subprocess, uuid
+from werkzeug.datastructures import ImmutableMultiDict
+import bcrypt
 import xml.etree.cElementTree as ET
 from datetime import datetime
 
+
+
 app = Flask(__name__)
 basePath = Path(__file__).resolve().parent
+
+
 
 if os.getenv("HOST"):
     host = os.getenv("HOST")
 else:
     host = "localhost:8001"
 
-
 if os.getenv("CONFIG"):
     config_file = os.getenv("CONFIG")
 else:
     config_file = str(basePath) + "/config.json"
+
+
 
 
 def getConfig():
@@ -31,7 +34,7 @@ def getConfig():
     except:
         print("Creating config file")
         data = {}
-
+    
     data.setdefault("portals", {})
     data.setdefault("settings", {})
     data["settings"].setdefault(
@@ -40,6 +43,11 @@ def getConfig():
     data["settings"].setdefault("hdhr name", "STB-Proxy")
     data["settings"].setdefault("hdhr id", uuid.uuid4().hex)
     data["settings"].setdefault("hdhr tuners", "1")
+    data["settings"].setdefault("Username", "Admin")
+    data["settings"].setdefault("Password", "12345")
+    data["settings"].setdefault("JWT_KEY", "YOUR-SECRET-KEY")
+    data["settings"].setdefault("JWT_ISS", "YOUR-NAME")
+    data["settings"].setdefault("JWT_ALGO", "HS512")
 
     portals = data.get("portals")
     for portal in portals:
@@ -62,6 +70,32 @@ def getConfig():
 
     return data
 
+def jwtSign(email):
+  with open(config_file) as f:
+    data = json.load(f)
+  # https://stackoverflow.com/questions/2511222/efficiently-generate-a-16-character-alphanumeric-string
+  rnd = "".join(random.choice("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz~!@#$%^_-") for i in range(24))
+  now = int(time.time())
+  return jwt.encode({
+    "iat" : now, # ISSUED AT - TIME WHEN TOKEN IS GENERATED
+    "nbf" : now, # NOT BEFORE - WHEN THIS TOKEN IS CONSIDERED VALID
+    "exp" : now + 3600, # EXPIRY - 1 HR (3600 SECS) FROM NOW IN THIS EXAMPLE
+    "jti" : rnd, # RANDOM JSON TOKEN ID
+    "iss" : data["settings"]["JWT_ISS"] , # ISSUER
+    # WHATEVER ELSE YOU WANT TO PUT
+    "data" : { "email" : email }
+  }, data["settings"]["JWT_KEY"], algorithm=data["settings"]["JWT_ALGO"])
+ 
+def jwtVerify(cookies):
+    with open(config_file) as f:
+        data = json.load(f)
+    try:
+        token = cookies.get("JWT")
+        if token:
+            return True
+    except:
+        print(cookies.get("JWT"))
+        return False
 
 def getPortals():
     data = getConfig()
@@ -80,7 +114,6 @@ def getSettings():
     data = getConfig()
     return data["settings"]
 
-
 def saveSettings(settings):
     with open(config_file) as f:
         data = json.load(f)
@@ -90,253 +123,306 @@ def saveSettings(settings):
 
 
 @app.route("/", methods=["GET"])
-def home():
-    return redirect("/portals", code=302)
+def home(): 
+    return redirect("/login", code=302)
+
+@app.route('/login', methods=['GET','POST'])
+def login():
+  getConfig()
+  if jwtVerify(request.cookies):
+    return redirect(url_for("portals"))
+  else:
+    return render_template("login.html")
+
+@app.route("/lin", methods=["POST"])
+def lin():
+  with open(config_file) as f:
+    users = json.load(f)
+  hashed_password = bcrypt.hashpw(users["settings"]["Password"].encode('utf8'), bcrypt.gensalt())
+  data = dict(request.form)
+  valid = data["username"] in users["settings"]["Username"]
+  if valid:
+    valid = bcrypt.checkpw(data["password"].encode("utf-8"), hashed_password )
+  msg = "OK" if valid else "Invalid email/password"
+  res = make_response(msg, 200)
+  if valid:
+    res.set_cookie("JWT", jwtSign(data["username"]))
+  return res
+
+@app.route("/lout", methods=["POST"])
+def lout():
+  res = make_response("OK", 200)
+  res.delete_cookie("JWT")
+  return res
 
 
 @app.route("/portals", methods=["GET"])
 def portals():
-    portals = getPortals()
-    return render_template("portals.html", portals=portals)
+    print(request.cookies)
+    if jwtVerify(request.cookies):
+        portals = getPortals()
+        return render_template("portals.html", portals=portals)
+    else:
+     return redirect(url_for("login"))
+ 
 
 
 @app.route("/portal/add", methods=["POST"])
 def portalsAdd():
-    enabled = request.form["enabled"]
-    name = request.form["name"]
-    url = request.form["url"]
-    mac = request.form["mac"]
-    proxy = request.form["proxy"]
-    ffmpeg = request.form["ffmpeg"]
-    if url.endswith('.php') == False:
-        url = stb.getUrl(url, proxy)
-    try:
-        portals = getPortals()
-        token = stb.getToken(url, mac, proxy)
-        expiry = stb.getExpires(url, mac, token, proxy)
-        id = uuid.uuid4().hex
-        portals[id] = {
-            "enabled": enabled,
-            "name": name,
-            "url": url,
-            "mac": mac,
-            "proxy": proxy,
-            "ffmpeg": ffmpeg,
-            "expires": expiry,
-        }
-        savePortals(portals)
-    except:
-        print("Error adding portal")
-        pass
-    return redirect("/portals", code=302)
+    if jwtVerify(request.cookies):   
+        enabled = request.form["enabled"]
+        name = request.form["name"]
+        url = request.form["url"]
+        mac = request.form["mac"]
+        proxy = request.form["proxy"]
+        ffmpeg = request.form["ffmpeg"]
+        if url.endswith('.php') == False:
+            url = stb.getUrl(url, proxy)
+        try:
+            portals = getPortals()
+            token = stb.getToken(url, mac, proxy)
+            expiry = stb.getExpires(url, mac, token, proxy)
+            id = uuid.uuid4().hex
+            portals[id] = {
+                "enabled": enabled,
+                "name": name,
+                "url": url,
+                "mac": mac,
+                "proxy": proxy,
+                "ffmpeg": ffmpeg,
+                "expires": expiry,
+            }
+            savePortals(portals)
+        except:
+            print("Error adding portal")
+            pass
+        return redirect("/portals", code=302)
+    else:
+        return redirect(url_for("login"))
 
 
 @app.route("/portal/update", methods=["POST"])
 def portalUpdate():
-    id = request.form["id"]
-    enabled = request.form["enabled"]
-    name = request.form["name"]
-    url = request.form["url"]
-    mac = request.form["mac"]
-    proxy = request.form["proxy"]
-    ffmpeg = request.form["ffmpeg"]
-    if url.endswith('.php') == False:
-        url = stb.getUrl(url, proxy)
-    try:
-        portals = getPortals()
-        token = stb.getToken(url, mac, proxy)
-        expiry = stb.getExpires(url, mac, token, proxy)
-        portals[id]["enabled"] = enabled
-        portals[id]["name"] = name
-        portals[id]["url"] = url
-        portals[id]["mac"] = mac
-        portals[id]["proxy"] = proxy
-        portals[id]["ffmpeg"] = ffmpeg
-        portals[id]["expires"] = expiry
-        savePortals(portals)
-    except:
-        print("Error updating portal")
-        pass
-    return redirect("/portals", code=302)
-
+    if jwtVerify(request.cookies):
+        id = request.form["id"]
+        enabled = request.form["enabled"]
+        name = request.form["name"]
+        url = request.form["url"]
+        mac = request.form["mac"]
+        proxy = request.form["proxy"]
+        ffmpeg = request.form["ffmpeg"]
+        if url.endswith('.php') == False:
+            url = stb.getUrl(url, proxy)
+        try:
+            portals = getPortals()
+            token = stb.getToken(url, mac, proxy)
+            expiry = stb.getExpires(url, mac, token, proxy)
+            portals[id]["enabled"] = enabled
+            portals[id]["name"] = name
+            portals[id]["url"] = url
+            portals[id]["mac"] = mac
+            portals[id]["proxy"] = proxy
+            portals[id]["ffmpeg"] = ffmpeg
+            portals[id]["expires"] = expiry
+            savePortals(portals)
+        except:
+            print("Error updating portal")
+            pass
+        return redirect("/portals", code=302)
+    else:
+        return redirect(url_for("login"))  
 
 @app.route("/portal/remove", methods=["POST"])
 def portalRemove():
-    id = request.form["id"]
-    portals = getPortals()
-    del portals[id]
-    savePortals(portals)
-    return redirect("/portals", code=302)
-
+    if jwtVerify(request.cookies):
+        id = request.form["id"]
+        portals = getPortals()
+        del portals[id]
+        savePortals(portals)
+        return redirect("/portals", code=302)
+    else:
+        return redirect(url_for("login"))  
 
 @app.route("/editor", methods=["GET"])
 def editor():
-    channels = []
-    portals = getPortals()
-    if len(portals) > 0:
-        for portal in portals:
-            if portals[portal]["enabled"] == "true":
-                portalName = portals[portal]["name"]
-                url = portals[portal]["url"]
-                mac = portals[portal]["mac"]
-                proxy = portals[portal]["proxy"]
-                enabledChannels = portals[portal]["enabled channels"]
-                customChannelNames = portals[portal]["custom channel names"]
-                customGenres = portals[portal]["custom genres"]
-                customChannelNumbers = portals[portal]["custom channel numbers"]
-                customEpgIds = portals[portal]["custom epg ids"]
-                fallbackChannels = portals[portal]["fallback channels"]
-                try:
-                    token = stb.getToken(url, mac, proxy)
-                    allChannels = stb.getAllChannels(url, mac, token, proxy)
-                    genres = stb.getGenres(url, mac, token, proxy)
-                    for channel in allChannels:
-                        channelId = str(channel["id"])
-                        channelName = str(channel["name"])
-                        channelNumber = str(channel["number"])
-                        genre = str(genres.get(channel["tv_genre_id"]))
-                        if channelId in enabledChannels:
-                            enabled = True
-                        else:
-                            enabled = False
-                        customChannelNumber = customChannelNumbers.get(
-                            channelId)
-                        if customChannelNumber == None:
-                            customChannelNumber = ""
-                        customChannelName = customChannelNames.get(channelId)
-                        if customChannelName == None:
-                            customChannelName = ""
-                        customGenre = customGenres.get(channelId)
-                        if customGenre == None:
-                            customGenre = ""
-                        customEpgId = customEpgIds.get(channelId)
-                        if customEpgId == None:
-                            customEpgId = ""
-                        fallbackChannel = fallbackChannels.get(channelId)
-                        if fallbackChannel == None:
-                            fallbackChannel = ""
-                        channels.append(
-                            {
-                                "portal": portal,
-                                "portalName": portalName,
-                                "enabled": enabled,
-                                "channelNumber": channelNumber,
-                                "customChannelNumber": customChannelNumber,
-                                "channelName": channelName,
-                                "customChannelName": customChannelName,
-                                "genre": genre,
-                                "customGenre": customGenre,
-                                "channelId": channelId,
-                                "customEpgId": customEpgId,
-                                "fallbackChannel": fallbackChannel,
-                                "link": "http://"
-                                + host
-                                + "/play/"
-                                + portal
-                                + "/"
-                                + channelId
-                                + "?web=true",
-                            }
-                        )
-                except:
-                    print(sys.exc_info()[1])
-                    pass
-    return render_template("editor.html", channels=channels)
-
+    if jwtVerify(request.cookies):
+        channels = []
+        portals = getPortals()
+        if len(portals) > 0:
+            for portal in portals:
+                if portals[portal]["enabled"] == "true":
+                    portalName = portals[portal]["name"]
+                    url = portals[portal]["url"]
+                    mac = portals[portal]["mac"]
+                    proxy = portals[portal]["proxy"]
+                    enabledChannels = portals[portal]["enabled channels"]
+                    customChannelNames = portals[portal]["custom channel names"]
+                    customGenres = portals[portal]["custom genres"]
+                    customChannelNumbers = portals[portal]["custom channel numbers"]
+                    customEpgIds = portals[portal]["custom epg ids"]
+                    fallbackChannels = portals[portal]["fallback channels"]
+                    try:
+                        token = stb.getToken(url, mac, proxy)
+                        allChannels = stb.getAllChannels(url, mac, token, proxy)
+                        genres = stb.getGenres(url, mac, token, proxy)
+                        for channel in allChannels:
+                            channelId = str(channel["id"])
+                            channelName = str(channel["name"])
+                            channelNumber = str(channel["number"])
+                            genre = str(genres.get(channel["tv_genre_id"]))
+                            if channelId in enabledChannels:
+                                enabled = True
+                            else:
+                                enabled = False
+                            customChannelNumber = customChannelNumbers.get(
+                                channelId)
+                            if customChannelNumber == None:
+                                customChannelNumber = ""
+                            customChannelName = customChannelNames.get(channelId)
+                            if customChannelName == None:
+                                customChannelName = ""
+                            customGenre = customGenres.get(channelId)
+                            if customGenre == None:
+                                customGenre = ""
+                            customEpgId = customEpgIds.get(channelId)
+                            if customEpgId == None:
+                                customEpgId = ""
+                            fallbackChannel = fallbackChannels.get(channelId)
+                            if fallbackChannel == None:
+                                fallbackChannel = ""
+                            channels.append(
+                                {
+                                    "portal": portal,
+                                    "portalName": portalName,
+                                    "enabled": enabled,
+                                    "channelNumber": channelNumber,
+                                    "customChannelNumber": customChannelNumber,
+                                    "channelName": channelName,
+                                    "customChannelName": customChannelName,
+                                    "genre": genre,
+                                    "customGenre": customGenre,
+                                    "channelId": channelId,
+                                    "customEpgId": customEpgId,
+                                    "fallbackChannel": fallbackChannel,
+                                    "link": "http://"
+                                    + host
+                                    + "/play/"
+                                    + portal
+                                    + "/"
+                                    + channelId
+                                    + "?web=true",
+                                }
+                            )
+                    except:
+                        print(sys.exc_info()[1])
+                        pass
+        return render_template("editor.html", channels=channels)
+    else:
+        return redirect(url_for("login")) 
 
 @app.route("/editor/save", methods=["POST"])
 def editorSave():
-    enabledEdits = json.loads(request.form["enabledEdits"])
-    numberEdits = json.loads(request.form["numberEdits"])
-    nameEdits = json.loads(request.form["nameEdits"])
-    genreEdits = json.loads(request.form["genreEdits"])
-    epgEdits = json.loads(request.form["epgEdits"])
-    fallbackEdits = json.loads(request.form["fallbackEdits"])
-    portals = getPortals()
-    for edit in enabledEdits:
-        portal = edit["portal"]
-        channelId = edit["channel id"]
-        enabled = edit["enabled"]
-        if enabled:
-            portals[portal]["enabled channels"].append(channelId)
-        else:
-            #portals[portal]["enabled channels"].remove(channelId)
-            portals[portal]["enabled channels"] = list(filter((channelId).__ne__, portals[portal]["enabled channels"]))
+    if jwtVerify(request.cookies):
+        enabledEdits = json.loads(request.form["enabledEdits"])
+        numberEdits = json.loads(request.form["numberEdits"])
+        nameEdits = json.loads(request.form["nameEdits"])
+        genreEdits = json.loads(request.form["genreEdits"])
+        epgEdits = json.loads(request.form["epgEdits"])
+        fallbackEdits = json.loads(request.form["fallbackEdits"])
+        portals = getPortals()
+        for edit in enabledEdits:
+            portal = edit["portal"]
+            channelId = edit["channel id"]
+            enabled = edit["enabled"]
+            if enabled:
+                portals[portal]["enabled channels"].append(channelId)
+            else:
+                #portals[portal]["enabled channels"].remove(channelId)
+                portals[portal]["enabled channels"] = list(filter((channelId).__ne__, portals[portal]["enabled channels"]))
 
-    for edit in numberEdits:
-        portal = edit["portal"]
-        channelId = edit["channel id"]
-        customNumber = edit["custom number"]
-        if customNumber:
-            portals[portal]["custom channel numbers"].update(
-                {channelId: customNumber})
-        else:
-            portals[portal]["custom channel numbers"].pop(channelId)
+        for edit in numberEdits:
+            portal = edit["portal"]
+            channelId = edit["channel id"]
+            customNumber = edit["custom number"]
+            if customNumber:
+                portals[portal]["custom channel numbers"].update(
+                    {channelId: customNumber})
+            else:
+                portals[portal]["custom channel numbers"].pop(channelId)
 
-    for edit in nameEdits:
-        portal = edit["portal"]
-        channelId = edit["channel id"]
-        customName = edit["custom name"]
-        if customName:
-            portals[portal]["custom channel names"].update(
-                {channelId: customName})
-        else:
-            portals[portal]["custom channel names"].pop(channelId)
+        for edit in nameEdits:
+            portal = edit["portal"]
+            channelId = edit["channel id"]
+            customName = edit["custom name"]
+            if customName:
+                portals[portal]["custom channel names"].update(
+                    {channelId: customName})
+            else:
+                portals[portal]["custom channel names"].pop(channelId)
 
-    for edit in genreEdits:
-        portal = edit["portal"]
-        channelId = edit["channel id"]
-        customGenre = edit["custom genre"]
-        if customGenre:
-            portals[portal]["custom genres"].update({channelId: customGenre})
-        else:
-            portals[portal]["custom genres"].pop(channelId)
+        for edit in genreEdits:
+            portal = edit["portal"]
+            channelId = edit["channel id"]
+            customGenre = edit["custom genre"]
+            if customGenre:
+                portals[portal]["custom genres"].update({channelId: customGenre})
+            else:
+                portals[portal]["custom genres"].pop(channelId)
 
-    for edit in epgEdits:
-        portal = edit["portal"]
-        channelId = edit["channel id"]
-        customEpgId = edit["custom epg id"]
-        if customEpgId:
-            portals[portal]["custom epg ids"].update({channelId: customEpgId})
-        else:
-            portals[portal]["custom epg ids"].pop(channelId)
+        for edit in epgEdits:
+            portal = edit["portal"]
+            channelId = edit["channel id"]
+            customEpgId = edit["custom epg id"]
+            if customEpgId:
+                portals[portal]["custom epg ids"].update({channelId: customEpgId})
+            else:
+                portals[portal]["custom epg ids"].pop(channelId)
 
-    for edit in fallbackEdits:
-        portal = edit["portal"]
-        channelId = edit["channel id"]
-        channelName = edit["channel name"]
-        if channelName:
-            portals[portal]["fallback channels"].update(
-                {channelId: channelName})
-        else:
-            portals[portal]["fallback channels"].pop(channelId)
+        for edit in fallbackEdits:
+            portal = edit["portal"]
+            channelId = edit["channel id"]
+            channelName = edit["channel name"]
+            if channelName:
+                portals[portal]["fallback channels"].update(
+                    {channelId: channelName})
+            else:
+                portals[portal]["fallback channels"].pop(channelId)
 
-    savePortals(portals)
-    return redirect("/editor", code=302)
-
+        savePortals(portals)
+        return redirect("/editor", code=302)
+    else:
+        return redirect(url_for("login")) 
 
 @app.route("/settings", methods=["GET"])
 def settings():
-    settings = getSettings()
-    return render_template("settings.html", settings=settings)
-
+    if jwtVerify(request.cookies):
+        settings = getSettings()
+        return render_template("settings.html", settings=settings)
+    else:
+        return redirect(url_for("login")) 
 
 @app.route("/settings/save", methods=["POST"])
 def save():
-    ffmpeg = request.form["ffmpeg command"]
-    ffprobe = request.form["ffprobe timeout"]
-    hdhrName = request.form["hdhr name"]
-    hdhrTuners = request.form["hdhr tuners"]
-    id = getSettings()["hdhr id"]
-    settings = {"ffmpeg command": ffmpeg,
-                "ffprobe timeout": ffprobe,
-                "hdhr name": hdhrName,
-                "hdhr tuners": hdhrTuners,
-                "hdhr id": id
-                }
-    saveSettings(settings)
-    return redirect("/settings", code=302)
-
+    if jwtVerify(request.cookies):
+        ffmpeg = request.form["ffmpeg command"]
+        ffprobe = request.form["ffprobe timeout"]
+        hdhrName = request.form["hdhr name"]
+        hdhrTuners = request.form["hdhr tuners"]
+        new_username = request.form["Username"]
+        new_password = request.form["Password"]
+        id = getSettings()["hdhr id"]
+        settings = {"ffmpeg command": ffmpeg,
+                    "ffprobe timeout": ffprobe,
+                    "hdhr name": hdhrName,
+                    "hdhr tuners": hdhrTuners,
+                    "hdhr id": id,
+                    "Username": new_username,
+                    "Password": new_password
+                    }
+        saveSettings(settings)
+        return redirect("/settings", code=302)
+    else:
+        return redirect(url_for("login")) 
 
 @app.route("/playlist", methods=["GET"])
 def playlist():

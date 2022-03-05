@@ -11,7 +11,9 @@ RUN apk add \
 RUN pip3 install \
 	flask \
 	requests\
-	retrying
+	retrying\
+	pyjwt\
+	bcrypt\
 
 # Copy files
 COPY /app.py /app/app.py

@@ -66,6 +66,29 @@
                             onclick="resetHdhrTuners()"></i></button>
                 </td>
             </tr>
+
+            <tr>
+                <th scope="row" class="align-middle" style="width:0%; white-space:nowrap">Username:</th>
+                <td>
+                    <input form="save" type="text" name="Username" id="Username" class="form-control"
+                        value="{{ settings['Username'] }}" title="Username for Login" required>
+                </td>
+                <td>
+                    <button class="btn btn-danger btn-block" title="Reset"><i class="fa fa-undo"
+                            onclick="resetUsername()"></i></button>
+                </td>
+            </tr>
+            <tr>
+                <th scope="row" class="align-middle" style="width:0%; white-space:nowrap">Password:</th>
+                <td>
+                    <input form="save" type="text" name="Password" id="Password" class="form-control"
+                        value="{{ settings['Password'] }}" title="Password for Login" required>
+                </td>
+                <td>
+                    <button class="btn btn-danger btn-block" title="Reset"><i class="fa fa-undo"
+                            onclick="resetPassword()"></i></button>
+                </td>
+            </tr>
         </tbody>
     </table>
 </div>
@@ -85,6 +108,12 @@
 
     function resetHdhrTuners() {
         document.getElementById("hdhr tuners").value = "1";
+    }
+    function resetUsername() {
+        document.getElementById("Username").value = "Admin";
+    }
+    function resetPassword() {
+        document.getElementById("Password").value = "12345";
     }
 </script>
 
