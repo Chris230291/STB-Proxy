@@ -89,6 +89,28 @@
                             onclick="resetPassword()"></i></button>
                 </td>
             </tr>
+            <tr>
+                <th scope="row" class="align-middle" style="width:0%; white-space:nowrap">JWT Secret Key (Anything you want):</th>
+                <td>
+                    <input form="save" type="text" name="JWT_KEY" id="JWT_KEY" class="form-control"
+                        value="{{ settings['JWT_KEY'] }}" title="JWT Secret Key" required>
+                </td>
+                <td>
+                    <button class="btn btn-danger btn-block" title="Reset"><i class="fa fa-undo"
+                            onclick="resetJWTKey()"></i></button>
+                </td>
+            </tr>
+            <tr>
+                <th scope="row" class="align-middle" style="width:0%; white-space:nowrap">JWT Name (Anything you want):</th>
+                <td>
+                    <input form="save" type="text" name="JWT_ISS" id="JWT_ISS" class="form-control"
+                        value="{{ settings['JWT_ISS'] }}" title="JWT Name (Anything you want)." required>
+                </td>
+                <td>
+                    <button class="btn btn-danger btn-block" title="Reset"><i class="fa fa-undo"
+                            onclick="resetJWTiss()"></i></button>
+                </td>
+            </tr>
         </tbody>
     </table>
 </div>
@@ -114,6 +136,12 @@
     }
     function resetPassword() {
         document.getElementById("Password").value = "12345";
+    }
+    function resetJWTKey() {
+        document.getElementById("JWT_KEY").value = "TYnc6fUVtpJJs6ykVfdS";
+    }
+    function resetJWTiss() {
+        document.getElementById("JWT_ISS").value = "STB-Proxy";
     }
 </script>
 

@@ -45,8 +45,8 @@ def getConfig():
     data["settings"].setdefault("hdhr tuners", "1")
     data["settings"].setdefault("Username", "Admin")
     data["settings"].setdefault("Password", "12345")
-    data["settings"].setdefault("JWT_KEY", "YOUR-SECRET-KEY")
-    data["settings"].setdefault("JWT_ISS", "YOUR-NAME")
+    data["settings"].setdefault("JWT_KEY", "TYnc6fUVtpJJs6ykVfdS")
+    data["settings"].setdefault("JWT_ISS", "STB-Proxy")
     data["settings"].setdefault("JWT_ALGO", "HS512")
 
     portals = data.get("portals")
@@ -70,20 +70,20 @@ def getConfig():
 
     return data
 
-def jwtSign(email):
+def jwtSign(username):
   with open(config_file) as f:
     data = json.load(f)
   # https://stackoverflow.com/questions/2511222/efficiently-generate-a-16-character-alphanumeric-string
-  rnd = "".join(random.choice("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz~!@#$%^_-") for i in range(24))
+  rnd = "".join(random.choice("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz~!@#$%^_-") for i in range(64))
   now = int(time.time())
   return jwt.encode({
     "iat" : now, # ISSUED AT - TIME WHEN TOKEN IS GENERATED
     "nbf" : now, # NOT BEFORE - WHEN THIS TOKEN IS CONSIDERED VALID
-    "exp" : now + 3600, # EXPIRY - 1 HR (3600 SECS) FROM NOW IN THIS EXAMPLE
+    "exp" : now + 5400, # EXPIRY - 1 HR (3600 SECS) FROM NOW IN THIS EXAMPLE
     "jti" : rnd, # RANDOM JSON TOKEN ID
     "iss" : data["settings"]["JWT_ISS"] , # ISSUER
     # WHATEVER ELSE YOU WANT TO PUT
-    "data" : { "email" : email }
+    "data" : { "username" : username }
   }, data["settings"]["JWT_KEY"], algorithm=data["settings"]["JWT_ALGO"])
  
 def jwtVerify(cookies):
@@ -91,7 +91,9 @@ def jwtVerify(cookies):
         data = json.load(f)
     try:
         token = cookies.get("JWT")
-        if token:
+        decoded = jwt.decode(token, data["settings"]["JWT_KEY"], algorithms=data["settings"]["JWT_ALGO"])
+        decoded_string = json.dumps(decoded)
+        if data["settings"]["JWT_ISS"] and data["settings"]["Username"] in decoded_string:
             return True
     except:
         print(cookies.get("JWT"))
@@ -158,7 +160,6 @@ def lout():
 
 @app.route("/portals", methods=["GET"])
 def portals():
-    print(request.cookies)
     if jwtVerify(request.cookies):
         portals = getPortals()
         return render_template("portals.html", portals=portals)
@@ -410,6 +411,8 @@ def save():
         hdhrTuners = request.form["hdhr tuners"]
         new_username = request.form["Username"]
         new_password = request.form["Password"]
+        new_JWTKEY = request.form["JWT_KEY"]
+        new_JWTISS = request.form["JWT_ISS"]
         id = getSettings()["hdhr id"]
         settings = {"ffmpeg command": ffmpeg,
                     "ffprobe timeout": ffprobe,
@@ -417,7 +420,9 @@ def save():
                     "hdhr tuners": hdhrTuners,
                     "hdhr id": id,
                     "Username": new_username,
-                    "Password": new_password
+                    "Password": new_password,
+                    "JWT_KEY": new_JWTKEY,
+                    "JWT_ISS": new_JWTISS
                     }
         saveSettings(settings)
         return redirect("/settings", code=302)
