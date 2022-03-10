@@ -5,6 +5,9 @@ ENV HOST=localhost
 ENV CONFIG=/config/config.json
 
 RUN apk add \
+        python3-dev \
+        openssl-dev \
+        libffi-dev \
 	py3-pip \
 	ffmpeg \
         gcc
