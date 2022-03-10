@@ -6,6 +6,8 @@ ENV CONFIG=/config/config.json
 
 RUN apk add \
         python3-dev \
+        musl-dev \
+        make \
         openssl-dev \
         libffi-dev \
 	py3-pip \
