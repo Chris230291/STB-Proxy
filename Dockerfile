@@ -13,7 +13,7 @@ RUN pip3 install \
 	requests\
 	retrying\
 	pyjwt\
-	bcrypt\
+	bcrypt
 
 # Copy files
 COPY /app.py /app/app.py
