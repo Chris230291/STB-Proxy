@@ -6,13 +6,14 @@ ENV CONFIG=/config/config.json
 
 RUN apk add \
 	py3-pip \
-	ffmpeg
+	ffmpeg \
+        gcc
 
 RUN pip3 install \
 	flask \
-	requests\
-	retrying\
-	pyjwt\
+	requests \
+	retrying \
+	pyjwt \
 	bcrypt
 
 # Copy files
