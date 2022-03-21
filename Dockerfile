@@ -4,6 +4,8 @@ ENV HOST=localhost
 
 ENV CONFIG=/config/config.json
 
+ENV CACHE=/cache/
+
 RUN apk add \
 	py3-pip \
 	ffmpeg

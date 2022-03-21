@@ -16,7 +16,7 @@
 </head>
 
 <body class="bg-dark">
-    <nav class="navbar navbar-expand-lg navbar-light bg-light m-lg-5">
+    <nav class="navbar navbar-expand-lg navbar-light bg-light mb-3 mb-lg-3 mt-lg-5 mx-lg-5">
         <div class="container-fluid">
             <a class="navbar-brand">
                 <img src="../static/tv.png" alt="" width="24" class="d-inline-block align-text-top">
@@ -39,7 +39,20 @@
                         <a class="nav-link" href="/settings"><i class="fa fa-magic"></i> Settings</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" target="_blank" href="/playlist"><i class="fa fa-file-video-o"></i> M3U</a>
+                        <a class="nav-link" href="/log"><i class="fa fa-file-text-o"></i> Log</a>
+                    </li>
+                    <!-- <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="navbarDarkDropdownMenuLink" role="button" data-bs-toggle="dropdown"><i class="fa fa-file-video-o"></i> M3U
+                        </a>
+                        <ul class="dropdown-menu">
+                          <li><a class="dropdown-item" target="_blank" href="/playlist">TV</a></li>
+                          <li><a class="dropdown-item" href="#">Movies</a></li>
+                          <li><a class="dropdown-item" href="#">Series</a></li>
+                        </ul>
+                      </li> -->
+                    <li class="nav-item">
+                        <a class="nav-link" target="_blank" href="/playlist"><i class="fa fa-file-video-o"></i>
+                            Playlist</a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link" target="_blank" href="/xmltv"><i class="fa fa-file-code-o"></i> XMLTV</a>
@@ -49,8 +62,25 @@
         </div>
     </nav>
 
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for category, message in messages %}
+    <div class="alert alert-{{ category }} alert-dismissible fade show mx-lg-5" role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+    {% endfor %}
+    {% endwith %}
+
     {% block content %}{% endblock %}
 
 </body>
 
 </html>
+
+<script>
+    window.setTimeout(function () {
+        $(".alert").fadeTo(500, 0).slideUp(500, function () {
+            $(this).remove();
+        });
+    }, 4000);
+</script>

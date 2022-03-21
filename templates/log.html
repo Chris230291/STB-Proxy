@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="container-fluid text-light pt-sm-5 p-lg-5 h-25">
+    <pre class="border p-3" style="height: 40pc; overflow-y: scroll;" id="output"></pre>
+</div>
+
+<script>
+    var output = document.getElementById('output');
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', "{{ url_for('stream') }}");
+    xhr.send();
+    setInterval(function () {
+        output.textContent = xhr.responseText;
+    }, 1000);
+</script>
+
+{% endblock %}

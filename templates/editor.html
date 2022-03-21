@@ -118,10 +118,13 @@
     var fallbackEdits = [];
 
     function editAll(ele) {
-        checkboxes = document.getElementsByClassName('checkbox');
+        var checkboxes = document.getElementsByClassName('checkbox');
+        var enable = ele.checked;
         for (var i = 0, n = checkboxes.length; i < n; i++) {
-            checkboxes[i].checked = ele.checked;
-            editEnabled(checkboxes[i])
+            if (i != 0) {
+                checkboxes[i].checked = enable;
+                checkboxes[i].onchange();
+            }
         }
     }
 
@@ -130,6 +133,7 @@
         var i = ele.getAttribute('data-channelId');
         var c = ele.checked;
         var j = { "portal": p, "channel id": i, "enabled": c };
+        console.log(j)
         enabledEdits.push(j);
     }
 
@@ -217,7 +221,7 @@
 
     $(document).ready(function () {
         var table = $('#table').DataTable({
-            dom: "<'row mt-1 mt-lg-0'<'col-auto'B><'col-auto ms-auto'f><'col-auto'l>>" +
+            dom: "<'row m-1'<'col-auto'B><'col-auto ms-auto'f><'col-auto'l>>" +
                 "<'row'<'col-12'tr>>" +
                 "<'row mb-1 mb-lg-0'<'col-auto text-light'i><'col-auto ms-auto'p>>",
             pageLength: 25,
@@ -241,9 +245,9 @@
             buttons: {
                 buttons: [
                     {
-                        text: '<i class="fa fa-save"></i>',
+                        text: '<i class="fa fa-save"></i> Save',
                         titleAttr: 'Save',
-                        className: "btn btn-success m-1",
+                        className: "btn btn-success",
                         action: function () {
                             save();
                         }

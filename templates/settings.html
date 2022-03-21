@@ -1,90 +1,123 @@
 {% extends "base.html" %}
 {% block content %}
-<div class=".container-fluid table-responsive m-lg-5">
+
+<div class="container-fluid text-light px-lg-5 pb-lg-5">
+
+    <div class="mt-sm-3">
+        <button form="save" class="btn btn-success btn-block" title="Save"><i class="fa fa-save"></i> Save</button>
+    </div>
+    <br>
 
     <form id="save" action="/settings/save" method="post"></form>
+    <input form="save" type="text" name="enable hdhr" id="enable hdhr" value="{{ settings['enable hdhr'] }}" hidden>
+    <input form="save" type="text" name="enable security" id="enable security" value="{{ settings['enable security'] }}"
+        hidden>
 
-    <div class="m-2">
-        <button form="save" class="btn btn-success btn-block" title="Save"><i class="fa fa-save"></i></button>
+    <h4>FFmpeg</h4>
+    <hr>
+    <div class="p-sm-3">
+        <h6>Command:</h6>
+        <div class="col-md-12">
+            <div class="input-group flex-nowrap">
+                <span class="input-group-text">ffmpeg -loglevel panic -hide_banner -http_proxy *proxy* -i
+                    *link*</span>
+                <input form="save" type="text" name="ffmpeg command" id="ffmpeg command" class="form-control"
+                    value="{{ settings['ffmpeg command'] }}" required>
+                <span class="input-group-text">pipe:</span>
+                <button class="btn btn-danger btn-block" title="Reset"><i class="fa fa-undo"
+                        onclick="resetDefault(this)" data-input="ffmpeg command"
+                        data-default="-vcodec copy -acodec copy -f mpegts"></i></button>
+            </div>
+        </div>
+        <span class="text-muted">Edit with caution! Check FFmpeg documentation for help.</span>
+        <br>
+        <br>
+        <h6>Timeout:</h6>
+        <div class="col-md-2">
+            <div class="input-group flex-nowrap">
+                <input form="save" type="number" name="ffprobe timeout" id="ffprobe timeout" class="form-control"
+                    value="{{ settings['ffprobe timeout'] }}" required>
+                <button class="btn btn-danger btn-block" title="Reset"><i class="fa fa-undo"
+                        onclick="resetDefault(this)" data-input="ffprobe timeout" data-default="5"></i></button>
+            </div>
+        </div>
+        <span class="text-muted">Seconds to wait for a stream before giving up.</span>
     </div>
 
-    <table id="table" class="table table-striped table-dark nowrap" style="width:fill">
-        <thead>
-            <tr>
-                <th>Option</th>
-                <th>Value</th>
-                <th>Reset</th>
-            </tr>
-        </thead>
-        <tbody>
-            <tr>
-                <th scope="row" class="align-middle" style="width:0%; white-space:nowrap">FFmpeg Command:</th>
-                <td>
-                    <div class="input-group flex-nowrap">
-                        <span class="input-group-text">ffmpeg -loglevel panic -hide_banner -http_proxy *proxy* -i
-                            *link*</span>
-                        <input form="save" type="text" name="ffmpeg command" id="ffmpeg command" class="form-control"
-                            value="{{ settings['ffmpeg command'] }}" title="Edit the FFmpeg command. See FFmpeg documentation for help." required>
-                        <span class="input-group-text">pipe:</span>
-                    </div>
-                </td>
-                <td>
-                    <button class="btn btn-danger btn-block" title="Reset"><i class="fa fa-undo"
-                            onclick="resetFfmpeg()"></i></button>
-                </td>
-            </tr>
-            <tr>
-                <th scope="row" class="align-middle" style="width:0%; white-space:nowrap">Test Timeout:</th>
-                <td>
-                    <input form="save" type="number" name="ffprobe timeout" id="ffprobe timeout" class="form-control"
-                        value="{{ settings['ffprobe timeout'] }}" title="Time to wait for a stream before giving up in seconds." required>
-                </td>
-                <td>
-                    <button class="btn btn-danger btn-block" title="Reset"><i class="fa fa-undo"
-                            onclick="resetFfprobe()"></i></button>
-                </td>
-            </tr>
-            <tr>
-                <th scope="row" class="align-middle" style="width:0%; white-space:nowrap">HDHR Name:</th>
-                <td>
-                    <input form="save" type="text" name="hdhr name" id="hdhr name" class="form-control"
-                        value="{{ settings['hdhr name'] }}" title="Display name of server in Plex DVR etc." required>
-                </td>
-                <td>
-                    <button class="btn btn-danger btn-block" title="Reset"><i class="fa fa-undo"
-                            onclick="resetHdhrName()"></i></button>
-                </td>
-            </tr>
-            <tr>
-                <th scope="row" class="align-middle" style="width:0%; white-space:nowrap">HDHR Tuners:</th>
-                <td>
-                    <input form="save" type="number" name="hdhr tuners" id="hdhr tuners" class="form-control"
-                        value="{{ settings['hdhr tuners'] }}" title="Max concurrent streams in Plex etc." required>
-                </td>
-                <td>
-                    <button class="btn btn-danger btn-block" title="Reset"><i class="fa fa-undo"
-                            onclick="resetHdhrTuners()"></i></button>
-                </td>
-            </tr>
-        </tbody>
-    </table>
+    <br>
+
+    <h4>Security</h4>
+    <hr>
+    <div class="p-sm-3">
+        <h6>Enable:</h6>
+        <div class="form-check form-switch">
+            <input type="checkbox" class="checkbox form-check-input" onchange="enable(this)"
+                data-input="enable security" {{ "checked" if settings['enable security']=='true' }}>
+        </div>
+        <br>
+        <h6>Username:</h6>
+        <div class="col-md-4">
+            <input form="save" type="text" name="username" id="username" class="form-control"
+                value="{{ settings['username'] }}" title="Username" required>
+        </div>
+        <br>
+        <h6>Password:</h6>
+        <div class="col-md-4">
+            <input form="save" type="text" name="password" id="password" class="form-control"
+                value="{{ settings['password'] }}" title="Password" required>
+        </div>
+        <span class="text-muted">Recommended if STB-Proxy is exposed to the internet or on a public network</span>
+    </div>
+
+    <br>
+
+    <h4>HDHomeRun</h4>
+    <hr>
+    <div class="p-sm-3">
+        <h6>Enable:</h6>
+        <div class="form-check form-switch">
+            <input type="checkbox" class="checkbox form-check-input" onchange="enable(this)" data-input="enable hdhr"
+                {{ "checked" if settings['enable hdhr']=='true' }}>
+        </div>
+        <br>
+        <h6>Name:</h6>
+        <div class="col-md-4">
+            <div class="input-group flex-nowrap">
+                <input form="save" type="text" name="hdhr name" id="hdhr name" class="form-control"
+                    value="{{ settings['hdhr name'] }}" required>
+                <button class="btn btn-danger btn-block" title="Reset"><i class="fa fa-undo"
+                        onclick="resetDefault(this)" data-input="hdhr name" data-default="STB-Proxy"></i></button>
+            </div>
+        </div>
+        <span class="text-muted">Display name of the server in Plex DVR etc.</span>
+
+        <br>
+
+        <h6>Tuners:</h6>
+        <div class="col-md-2">
+            <div class="input-group flex-nowrap">
+                <input form="save" type="number" name="hdhr tuners" id="hdhr tuners" class="form-control"
+                    value="{{ settings['hdhr tuners'] }}" required>
+                <button class="btn btn-danger btn-block" title="Reset"><i class="fa fa-undo"
+                        onclick="resetDefault(this)" data-input="hdhr tuners" data-default="1"></i></button>
+            </div>
+        </div>
+        <span class="text-muted">Max concurrent streams in Plex DVR etc.</span>
+    </div>
+
 </div>
 
 <script>
-    function resetFfmpeg() {
-        document.getElementById("ffmpeg command").value = "-vcodec copy -acodec copy -f mpegts";
+    function resetDefault(ele) {
+        var d = ele.getAttribute('data-default');
+        var i = ele.getAttribute('data-input');
+        document.getElementById(i).value = d;
     }
 
-    function resetFfprobe() {
-        document.getElementById("ffprobe timeout").value = "5";
-    }
-
-    function resetHdhrName() {
-        document.getElementById("hdhr name").value = "STB-Proxy";
-    }
-
-    function resetHdhrTuners() {
-        document.getElementById("hdhr tuners").value = "1";
+    function enable(ele) {
+        var c = ele.checked;
+        var i = ele.getAttribute('data-input');
+        document.getElementById(i).value = c;
     }
 </script>
 

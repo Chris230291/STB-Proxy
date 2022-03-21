@@ -2,6 +2,7 @@ import requests
 from retrying import retry
 from urllib.parse import urlparse
 import re
+import math
 
 
 @retry(stop_max_attempt_number=4, wait_exponential_multiplier=200, wait_exponential_max=2000)
@@ -211,3 +212,106 @@ def getEpg(url, mac, token, period, proxy=None):
     except:
         pass
     raise Exception("Found no EPG data")
+
+
+def getVods(url, mac, token, proxy=None):
+    proxies = {"http": proxy, "https": proxy}
+    cookies = {"mac": mac, "stb_lang": "en", "timezone": "Europe/London"}
+    headers = {
+        "User-Agent": "Mozilla/5.0 (QtEmbedded; U; Linux; C)",
+        "Authorization": "Bearer " + token,
+    }
+    try:
+        response = requests.get(
+            url + "?type=vod&action=get_ordered_list&p=1&JsHttpRequest=1-xml",
+            cookies=cookies,
+            headers=headers,
+            proxies=proxies
+        )
+        data = response.json()["js"]
+        pages = math.ceil(int(data["total_items"]) /
+                          int(data["max_page_items"]))
+        vods = response.json()["js"]["data"]
+
+        for i in range(2, pages):
+            response = requests.get(
+                url + "?type=vod&action=get_ordered_list&p=" +
+                str(i) + "&JsHttpRequest=1-xml",
+                cookies=cookies,
+                headers=headers,
+                proxies=proxies
+            )
+            vods = vods + response.json()["js"]["data"]
+        if vods:
+            return vods
+    except:
+        pass
+    raise Exception("Found no VOD data")
+
+
+@retry(stop_max_attempt_number=4, wait_exponential_multiplier=200, wait_exponential_max=2000)
+def getVodLink(url, mac, token, cmd, proxy=None):
+    proxies = {"http": proxy, "https": proxy}
+    cookies = {"mac": mac, "stb_lang": "en", "timezone": "Europe/London"}
+    headers = {
+        "User-Agent": "Mozilla/5.0 (QtEmbedded; U; Linux; C)",
+        "Authorization": "Bearer " + token,
+    }
+    try:
+        response = requests.get(
+            url + "?type=vod&action=create_link&cmd=" + cmd + "&JsHttpRequest=1-xml",
+            cookies=cookies,
+            headers=headers,
+            proxies=proxies
+        )
+        data = response.json()
+        link = data["js"]["cmd"].split()[-1]
+        if link:
+            return link
+    except:
+        pass
+    raise Exception("Error getting link")
+
+
+def getSeries(url, mac, token, proxy=None):
+    proxies = {"http": proxy, "https": proxy}
+    cookies = {"mac": mac, "stb_lang": "en", "timezone": "Europe/London"}
+    headers = {
+        "User-Agent": "Mozilla/5.0 (QtEmbedded; U; Linux; C)",
+        "Authorization": "Bearer " + token,
+    }
+    try:
+        response = requests.get(
+            url + "?type=series&action=get_ordered_list&p=1&JsHttpRequest=1-xml",
+            cookies=cookies,
+            headers=headers,
+            proxies=proxies
+        )
+        data = response.json()["js"]
+        if data:
+            return data
+    except:
+        pass
+    raise Exception("Found no VOD data")
+
+
+def test(url, mac, token, proxy=None):
+    proxies = {"http": proxy, "https": proxy}
+    cookies = {"mac": mac, "stb_lang": "en", "timezone": "Europe/London"}
+    headers = {
+        "User-Agent": "Mozilla/5.0 (QtEmbedded; U; Linux; C)",
+        "Authorization": "Bearer " + token,
+    }
+    try:
+        response = requests.get(
+            url + "?type=series&action=get_ordered_list&movie_id=2198%3A1&category=2198:1&genre=*&season_id=0&episode_id=0&force_ch_link_check=&from_ch_id=0&fav=0&sortby=added&hd=0&not_ended=0&p=1&JsHttpRequest=1-xml",
+            cookies=cookies,
+            headers=headers,
+            proxies=proxies
+        )
+        data = response.json()["js"]
+        if data:
+            return data
+    except:
+        pass
+    raise Exception("Found no VOD data")
