@@ -10,6 +10,7 @@
 - Modify channel numbers
 - Override epg
 - Set fallback channels
+- Support for multiple MACs/Streams per Portal
 
 # Docker
 - Map whichever port you like to the default `8001`
