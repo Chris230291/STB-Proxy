@@ -1,3 +1,4 @@
+import flask
 import stb
 import os
 import json
@@ -47,7 +48,7 @@ except:
     pass
 
 occupied = {}
-
+config = {}
 
 def getConfig():
     try:
@@ -100,39 +101,59 @@ def getConfig():
 
 
 def getPortals():
-    data = getConfig()
-    return data["portals"]
+    #data = getConfig()
+    #return data["portals"]
+
+    return config["portals"]
 
 
 def savePortals(portals):
-    with open(config_file) as f:
-        data = json.load(f)
+    # with open(config_file) as f:
+    #     data = json.load(f)
+    # with open(config_file, "w") as f:
+    #     data["portals"] = portals
+    #     json.dump(data, f, indent=4)
+
+    global config
+    
     with open(config_file, "w") as f:
-        data["portals"] = portals
-        json.dump(data, f, indent=4)
+        config["portals"] = portals
+        json.dump(config, f, indent=4)
+
+    config = getConfig()
 
 
 def getSettings():
-    data = getConfig()
-    return data["settings"]
+    # data = getConfig()
+    # return data["settings"]
+    
+    return config["settings"]
 
 
 def saveSettings(settings):
-    with open(config_file) as f:
-        data = json.load(f)
+    # with open(config_file) as f:
+    #     data = json.load(f)
+    # with open(config_file, "w") as f:
+    #     data["settings"] = settings
+    #     json.dump(data, f, indent=4)
+
+    global config
+
     with open(config_file, "w") as f:
-        data["settings"] = settings
-        json.dump(data, f, indent=4)
+        config["settings"] = settings
+        json.dump(config, f, indent=4)
+        
+    config = getConfig()
 
 
 def authorise(f):
     @wraps(f)
     def decorated(*args, **kwargs):
         auth = request.authorization
-        config = getConfig()
-        security = config["settings"]["enable security"]
-        username = config["settings"]["username"]
-        password = config["settings"]["password"]
+        settings = getSettings()
+        security = settings["enable security"]
+        username = settings["username"]
+        password = settings["password"]
         if security == "false" or auth and auth.username == username and auth.password == password:
             return f(*args, ** kwargs)
 
@@ -943,17 +964,21 @@ def clear():
 def hdhr(f):
     @wraps(f)
     def decorated(*args, **kwargs):
-        config = getConfig()
-        security = config["settings"]["enable hdhr"]
-        if security:
-            return f(*args, ** kwargs)
+        auth = request.authorization
+        settings = getSettings()
+        security = settings["enable security"]
+        username = settings["username"]
+        password = settings["password"]
+        hdhrenabled = settings["enable hdhr"]
+        if security == "false" or auth and auth.username == username and auth.password == password:
+            if hdhrenabled:
+                return f(*args, ** kwargs)
         return make_response('Error', 404)
     return decorated
 
 
 @app.route("/discover.json", methods=["GET"])
 @hdhr
-@authorise
 def discover():
     settings = getSettings()
     name = settings["hdhr name"]
@@ -971,12 +996,11 @@ def discover():
         "ModelNumber": "1337",
         "TunerCount": int(tuners)
     }
-    return Response(json.dumps(data, indent=4), status=200, mimetype='application/json')
+    return flask.jsonify(data)
 
 
 @app.route('/lineup_status.json', methods=["GET"])
 @hdhr
-@authorise
 def status():
     data = {
         'ScanInProgress': 0,
@@ -984,13 +1008,12 @@ def status():
         'Source': "Antenna",
         'SourceList': ['Antenna']
     }
-    return Response(json.dumps(data, indent=4), status=200, mimetype='application/json')
+    return flask.jsonify(data)
 
 
 @app.route('/lineup.json', methods=["GET"])
 @app.route('/lineup.post', methods=["POST"])
 @hdhr
-@authorise
 def lineup():
     lineup = []
     portals = getPortals()
@@ -1025,8 +1048,10 @@ def lineup():
                 logger.error(
                     "Error making lineup for {}, skipping".format(name))
 
-    return json.dumps(lineup)
+    return flask.jsonify(lineup)
 
+
+config = getConfig()
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8001, debug=True)
