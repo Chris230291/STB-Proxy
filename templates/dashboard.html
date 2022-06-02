@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="container-fluid text-light pt-sm-5 p-lg-5 h-25">
+    <h4>Streaming</h4>
+    <hr>
+    <div class="container-fluid">
+
+        <div class="row row-cols-auto" id="streamOut">
+
+        </div>
+
+    </div>
+
+    <br>
+    <br>
+
+    <h4>Log</h4>
+    <hr>
+    <div class="p-sm-3">
+        <div class="row row-cols-auto mb-2">
+            <span class="col">Autoscroll:</span>
+            <div class="form-check form-switch col">
+                <input type="checkbox" class="checkbox form-check-input" id="autoscroll" checked>
+            </div>
+        </div>
+        <pre class="border p-3" style="height: 40pc; overflow-y: scroll;" id="logOut"></pre>
+    </div>
+</div>
+
+<script>
+    // Log
+    var logURL = "{{ url_for('log') }}";
+    var logOut = document.getElementById('logOut');
+    var autoscroll = document.getElementById('autoscroll');
+    setInterval(function updateLog() {
+        fetch(logURL)
+            .then(function (response) {
+                return response.text();
+            })
+            .then(function (text) {
+                logOut.textContent = text;
+                if (autoscroll.checked) {
+                    logOut.scrollTop = logOut.scrollHeight;
+                }
+            })
+        return updateLog;
+    }(), 2000);
+
+    // Streaming
+    var streamingURL = "{{ url_for('streaming') }}";
+    var streamOut = document.getElementById('streamOut');
+    setInterval(function updateStreaming() {
+
+        fetch(streamingURL)
+            .then(function (response) {
+                return response.json();
+            })
+            .then(function (json) {
+
+                var codeBlock = ''
+
+                for (var key in json) {
+                    if (json.hasOwnProperty(key)) {
+                        for (var key2 in json[key]) {
+                            var portal = json[key][key2]["portal name"]
+                            var mac = [key2][0]
+                            var client = json[key][key2]["client"]
+                            var channel = json[key][key2]["channel name"]
+                            var start = json[key][key2]["start time"] * 1000
+                            var now = Date.now()
+                            var timeDifference = now - start;
+                            var differenceDate = new Date(timeDifference);
+                            var diffHours = differenceDate.getUTCHours();
+                            var diffMinutes = differenceDate.getUTCMinutes();
+                            var diffSeconds = differenceDate.getUTCSeconds();
+                            var dur = String(diffHours).padStart(2, '0') + ':' + String(diffMinutes).padStart(2, '0') + ':' + String(diffSeconds).padStart(2, '0');
+
+                            // Storing HTML code block in a variable
+                            var codeBlock = codeBlock +
+                                '<div class="col">' +
+                                '<div class="card text-dark bg-light mb-3">' +
+                                '<div class="card-header"><i class="me-2 fa fa-user"></i>' + client + '</div>' +
+                                '<div class="card-body">' +
+                                '<table class="table table-sm">' +
+                                '<tr>' +
+                                '<td>' +
+                                '<i class="fa fa-play"></i>' +
+                                '</td>' +
+                                '<td>' +
+                                '<p class="card-text text-nowrap">' + channel + '</p>' +
+                                '</td>' +
+                                '</tr>' +
+                                '<tr>' +
+                                '<td>' +
+                                '<i class="fa fa-server"></i>' +
+                                '</td>' +
+                                '<td>' +
+                                '<p class="card-text text-nowrap">' + portal + '</p>' +
+                                '</td>' +
+                                '</tr>' +
+                                '<tr>' +
+                                '<td>' +
+                                '<i class="fa fa-lock"></i>' +
+                                '</td>' +
+                                '<td>' +
+                                '<p class="card-text text-nowrap">' + mac + '</p>' +
+                                '</td>' +
+                                '<tr>' +
+                                '<td>' +
+                                '<i class="fa fa-clock-o"></i>' +
+                                '</td>' +
+                                '<td>' +
+                                '<p class="card-text text-nowrap">' + dur + '</p>' +
+                                '</td>' +
+                                '</tr>' +
+                                '</table>' +
+                                '</div>' +
+                                '</div>' +
+                                '</div>';
+                        }
+                    }
+                }
+
+                // Inserting the code block to wrapper element
+                document.getElementById("streamOut").innerHTML = codeBlock
+
+            })
+        return updateStreaming;
+    }(), 1000);
+
+
+</script>
+
+{% endblock %}

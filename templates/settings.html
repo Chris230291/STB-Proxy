@@ -9,6 +9,9 @@
     <br>
 
     <form id="save" action="/settings/save" method="post"></form>
+    <input form="save" type="text" name="sort playlist by channel genre" id="sort playlist by channel genre" value="{{ settings['sort playlist by channel genre'] }}" hidden>
+    <input form="save" type="text" name="sort playlist by channel number" id="sort playlist by channel number" value="{{ settings['sort playlist by channel number'] }}" hidden>
+    <input form="save" type="text" name="sort playlist by channel name" id="sort playlist by channel name" value="{{ settings['sort playlist by channel name'] }}" hidden>
     <input form="save" type="text" name="enable hdhr" id="enable hdhr" value="{{ settings['enable hdhr'] }}" hidden>
     <input form="save" type="text" name="enable security" id="enable security" value="{{ settings['enable security'] }}"
         hidden>
@@ -42,6 +45,34 @@
             </div>
         </div>
         <span class="text-muted">Seconds to wait for a stream before giving up.</span>
+    </div>
+
+    <br>
+
+    <h4>Playlist</h4>
+    <hr>
+    <div class="p-sm-3">
+        <h6>Sort by genre:</h6>
+        <div class="col-md-12">
+            <div class="form-check form-switch">
+                <input type="checkbox" class="checkbox form-check-input" onchange="enable(this)"
+                    data-input="sort playlist by channel genre" {{ "checked" if settings['sort playlist by channel genre']=='true' }}>
+            </div>
+            <br>
+            <h6>Sort by number:</h6>
+            <div class="form-check form-switch">
+                <input type="checkbox" class="checkbox form-check-input" onchange="enable(this)"
+                    data-input="sort playlist by channel number" {{ "checked" if settings['sort playlist by channel number']=='true' }}>
+            </div>
+            <br>
+            <h6>Sort by name:</h6>
+            <div class="form-check form-switch">
+                <input type="checkbox" class="checkbox form-check-input" onchange="enable(this)"
+                    data-input="sort playlist by channel name" {{ "checked" if settings['sort playlist by channel name']=='true' }}>
+            </div>
+        </div>
+        <span class="text-muted">Sorting options stack and are applied: Genre > Number > Name</span>
+        <span class="text-muted">Without any sorting the channels are listed as the server lists them</span>
     </div>
 
     <br>
