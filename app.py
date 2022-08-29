@@ -9,7 +9,6 @@ import xml.etree.cElementTree as ET
 from flask import Flask, render_template, redirect, request, Response, make_response, flash
 from datetime import datetime, timezone
 from functools import wraps
-from time import sleep
 import secrets
 import random
 
@@ -38,6 +37,11 @@ if os.getenv("CONFIG"):
     configFile = os.getenv("CONFIG")
 else:
     configFile = os.path.join(basePath, "config.json")
+
+if os.getenv("DEBUG"):
+    debug = bool(os.getenv("DEBUG"))
+else:
+    debug = False
 
 occupied = {}
 config = {}
@@ -660,10 +664,15 @@ def channel(portalId, channelId):
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
             ) as ffmpeg_sb:
-                for chunk in iter(ffmpeg_sb.stdout.readline, ""):
-                    yield chunk
-                    if ffmpeg_sb.poll() is not None:
+                # for chunk in iter(ffmpeg_sb.stdout.readline, ""):
+                #     yield chunk
+                #     if ffmpeg_sb.poll() is not None:
+                #         break
+                while True:
+                    chunk = ffmpeg_sb.stdout.read(1024)
+                    if len(chunk) == 0:
                         break
+                    yield chunk
         except:
             pass
         finally:
@@ -779,29 +788,22 @@ def channel(portalId, channelId):
                 if web:
                     ffmpegcmd = [
                         "ffmpeg",
-                        "-loglevel",
-                        "panic",
+                        "-loglevel", "panic",
                         "-hide_banner",
-                        "-i",
-                        link,
-                        "-vcodec",
-                        "copy",
-                        "-f",
-                        "mp4",
-                        "-movflags",
-                        "frag_keyframe+empty_moov",
-                        "pipe:",
+                        "-i", link,
+                        "-vcodec", "copy",
+                        "-f", "mp4",
+                        "-movflags", "frag_keyframe+empty_moov",
+                        "pipe:"
                     ]
                     return Response(streamData())
 
                 else:
                     ffmpegcmd = [
                         "ffmpeg",
-                        "-loglevel",
-                        "panic",
+                        "-loglevel", "panic",
                         "-hide_banner",
-                        "-i",
-                        link,
+                        "-i", link
                     ]
                     ffmpegcmd.extend(
                         getSettings()["ffmpeg command"].split())
@@ -815,11 +817,9 @@ def channel(portalId, channelId):
                 if link:
                     ffmpegcmd = [
                         "ffmpeg",
-                        "-loglevel",
-                        "panic",
+                        "-loglevel", "panic",
                         "-hide_banner",
-                        "-i",
-                        link,
+                        "-i", link,
                     ]
                     ffmpegcmd.extend(
                         getSettings()["ffmpeg command"].split())
@@ -954,4 +954,4 @@ def lineup():
 
 if __name__ == "__main__":
     config = getConfig()
-    app.run(host="0.0.0.0", port=8001, debug=True)
+    app.run(host="0.0.0.0", port=8001, debug=debug)

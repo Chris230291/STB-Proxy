@@ -58,23 +58,20 @@
         <h6>Sort by genre:</h6>
         <div class="col-md-12">
             <div class="form-check form-switch">
-                <input type="checkbox" class="checkbox form-check-input" onchange="enable(this)"
-                    data-input="sort playlist by channel genre" {{ "checked" if settings['sort playlist by channel
-                    genre']=='true' }}>
+                <input type="checkbox" class="checkbox form-check-input" onchange="enable(this)" {{ "checked" if
+                    settings['sort playlist by channel genre']=='true' }} data-input="sort playlist by channel genre">
             </div>
             <br>
             <h6>Sort by number:</h6>
             <div class="form-check form-switch">
-                <input type="checkbox" class="checkbox form-check-input" onchange="enable(this)"
-                    data-input="sort playlist by channel number" {{ "checked" if settings['sort playlist by channel
-                    number']=='true' }}>
+                <input type="checkbox" class="checkbox form-check-input" onchange="enable(this)" {{ "checked" if
+                    settings['sort playlist by channel number']=='true' }} data-input="sort playlist by channel number">
             </div>
             <br>
             <h6>Sort by name:</h6>
             <div class="form-check form-switch">
-                <input type="checkbox" class="checkbox form-check-input" onchange="enable(this)"
-                    data-input="sort playlist by channel name" {{ "checked" if settings['sort playlist by channel
-                    name']=='true' }}>
+                <input type="checkbox" class="checkbox form-check-input" onchange="enable(this)" {{ "checked" if
+                    settings['sort playlist by channel name']=='true' }} data-input="sort playlist by channel name">
             </div>
         </div>
         <span class="text-muted">Sorting options stack and are applied: Genre > Number > Name<br>Without any sorting the
