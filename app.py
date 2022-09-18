@@ -6,7 +6,15 @@ import subprocess
 import uuid
 import logging
 import xml.etree.cElementTree as ET
-from flask import Flask, render_template, redirect, request, Response, make_response, flash
+from flask import (
+    Flask,
+    render_template,
+    redirect,
+    request,
+    Response,
+    make_response,
+    flash,
+)
 from datetime import datetime, timezone
 from functools import wraps
 import secrets
@@ -41,7 +49,7 @@ else:
 if os.getenv("DEBUG"):
     debug = bool(os.getenv("DEBUG"))
 else:
-    debug = False
+    debug = True
 
 occupied = {}
 config = {}
@@ -61,8 +69,7 @@ def getConfig():
     data["settings"].setdefault("sort playlist by channel genre", "false")
     data["settings"].setdefault("sort playlist by channel name", "false")
     data["settings"].setdefault("sort playlist by channel number", "false")
-    data["settings"].setdefault(
-        "ffmpeg command", "-vcodec copy -acodec copy -f mpegts")
+    data["settings"].setdefault("ffmpeg command", "-vcodec copy -acodec copy -f mpegts")
     data["settings"].setdefault("ffprobe timeout", "5")
     data["settings"].setdefault("enable hdhr", "false")
     data["settings"].setdefault("hdhr name", "STB-Proxy")
@@ -85,6 +92,7 @@ def getConfig():
             portals[portal].pop("expires")
         ####################
         portals[portal].setdefault("macs", [])
+        portals[portal].setdefault("streams per mac", 1),
         portals[portal].setdefault("proxy", "")
         portals[portal].setdefault("enabled channels", [])
         portals[portal].setdefault("custom channel numbers", {})
@@ -135,10 +143,20 @@ def authorise(f):
         security = settings["enable security"]
         username = settings["username"]
         password = settings["password"]
-        if security == "false" or auth and auth.username == username and auth.password == password:
-            return f(*args, ** kwargs)
+        if (
+            security == "false"
+            or auth
+            and auth.username == username
+            and auth.password == password
+        ):
+            return f(*args, **kwargs)
 
-        return make_response('Could not verify your login!', 401, {'WWW-Authenticate': 'Basic realm="Login Required"'})
+        return make_response(
+            "Could not verify your login!",
+            401,
+            {"WWW-Authenticate": 'Basic realm="Login Required"'},
+        )
+
     return decorated
 
 
@@ -161,9 +179,10 @@ def portalsAdd():
     name = request.form["name"]
     url = request.form["url"]
     macs = request.form["macs"].split(",")
+    streamsPerMac = request.form["streams per mac"]
     proxy = request.form["proxy"]
     id = uuid.uuid4().hex
-    if url.endswith('.php') == False:
+    if url.endswith(".php") == False:
         url = stb.getUrl(url, proxy)
     working = {}
     portals = getPortals()
@@ -174,27 +193,32 @@ def portalsAdd():
             if stb.getAllChannels(url, mac, token, proxy):
                 working[mac] = expiry
                 logger.info(
-                    "Successfully tested MAC({}) for Portal({})".format(mac, name))
-                flash("Successfully tested MAC({}) for Portal({})".format(
-                    mac, name), 'success')
+                    "Successfully tested MAC({}) for Portal({})".format(mac, name)
+                )
+                flash(
+                    "Successfully tested MAC({}) for Portal({})".format(mac, name),
+                    "success",
+                )
         except:
-            logger.error(
-                "Error testing MAC({}) for Portal({})".format(mac, name))
-            flash("Error testing MAC({}) for Portal({})".format(
-                mac, name), 'danger')
+            logger.error("Error testing MAC({}) for Portal({})".format(mac, name))
+            flash("Error testing MAC({}) for Portal({})".format(mac, name), "danger")
             pass
     if len(working) > 0:
         portals[id] = {
             "name": name,
             "url": url,
             "macs": working,
+            "streams per mac": streamsPerMac,
             "proxy": proxy,
         }
         savePortals(portals)
         logger.info("Portal({}) added!".format(name))
     else:
         logger.error(
-            "None of the accounts tested OK for Portal({}). Adding not successfull".format(name))
+            "None of the accounts tested OK for Portal({}). Adding not successfull".format(
+                name
+            )
+        )
 
     return redirect("/portals", code=302)
 
@@ -205,9 +229,10 @@ def portalUpdate():
     name = request.form["name"]
     url = request.form["url"]
     macs = request.form["macs"].split(",")
+    streamsPerMac = request.form["streams per mac"]
     proxy = request.form["proxy"]
     id = request.form["id"]
-    if url.endswith('.php') == False:
+    if url.endswith(".php") == False:
         url = stb.getUrl(url, proxy)
     working = {}
     portals = getPortals()
@@ -218,25 +243,30 @@ def portalUpdate():
             if stb.getAllChannels(url, mac, token, proxy):
                 working[mac] = expiry
                 logger.info(
-                    "Successfully tested MAC({}) for Portal({})".format(mac, name))
-                flash("Successfully tested MAC({}) for Portal({})".format(
-                    mac, name), 'success')
+                    "Successfully tested MAC({}) for Portal({})".format(mac, name)
+                )
+                flash(
+                    "Successfully tested MAC({}) for Portal({})".format(mac, name),
+                    "success",
+                )
         except:
-            logger.error(
-                "Error testing MAC({}) for Portal({})".format(mac, name))
-            flash("Error testing MAC({}) for Portal({})".format(
-                mac, name), 'danger')
+            logger.error("Error testing MAC({}) for Portal({})".format(mac, name))
+            flash("Error testing MAC({}) for Portal({})".format(mac, name), "danger")
             pass
     if len(working) > 0:
         portals[id]["name"] = name
         portals[id]["url"] = url
         portals[id]["macs"] = working
+        portals[id]["streams per mac"] = streamsPerMac
         portals[id]["proxy"] = proxy
         savePortals(portals)
         logger.info("Portal({}) updated!".format(name))
     else:
         logger.error(
-            "None of the accounts tested OK for Portal({}). Update not successfull".format(name))
+            "None of the accounts tested OK for Portal({}). Update not successfull".format(
+                name
+            )
+        )
 
     return redirect("/portals", code=302)
 
@@ -250,7 +280,7 @@ def portalRemove():
     del portals[id]
     savePortals(portals)
     logger.info("Portal ({}) removed!".format(name))
-    flash("Portal ({}) removed!".format(name), 'success')
+    flash("Portal ({}) removed!".format(name), "success")
     return redirect("/portals", code=302)
 
 
@@ -292,8 +322,7 @@ def editor():
                         enabled = True
                     else:
                         enabled = False
-                    customChannelNumber = customChannelNumbers.get(
-                        channelId)
+                    customChannelNumber = customChannelNumbers.get(channelId)
                     if customChannelNumber == None:
                         customChannelNumber = ""
                     customChannelName = customChannelNames.get(channelId)
@@ -333,9 +362,12 @@ def editor():
                     )
             else:
                 logger.error(
-                    "Error getting channel data for {}, skipping".format(portalName))
-                flash("Error getting channel data for {}, skipping".format(
-                    portalName), 'danger')
+                    "Error getting channel data for {}, skipping".format(portalName)
+                )
+                flash(
+                    "Error getting channel data for {}, skipping".format(portalName),
+                    "danger",
+                )
 
     return render_template("editor.html", channels=channels)
 
@@ -357,17 +389,17 @@ def editorSave():
         if enabled:
             portals[portal]["enabled channels"].append(channelId)
         else:
-            #portals[portal]["enabled channels"].remove(channelId)
+            # portals[portal]["enabled channels"].remove(channelId)
             portals[portal]["enabled channels"] = list(
-                filter((channelId).__ne__, portals[portal]["enabled channels"]))
+                filter((channelId).__ne__, portals[portal]["enabled channels"])
+            )
 
     for edit in numberEdits:
         portal = edit["portal"]
         channelId = edit["channel id"]
         customNumber = edit["custom number"]
         if customNumber:
-            portals[portal]["custom channel numbers"].update(
-                {channelId: customNumber})
+            portals[portal]["custom channel numbers"].update({channelId: customNumber})
         else:
             portals[portal]["custom channel numbers"].pop(channelId)
 
@@ -376,8 +408,7 @@ def editorSave():
         channelId = edit["channel id"]
         customName = edit["custom name"]
         if customName:
-            portals[portal]["custom channel names"].update(
-                {channelId: customName})
+            portals[portal]["custom channel names"].update({channelId: customName})
         else:
             portals[portal]["custom channel names"].pop(channelId)
 
@@ -404,14 +435,13 @@ def editorSave():
         channelId = edit["channel id"]
         channelName = edit["channel name"]
         if channelName:
-            portals[portal]["fallback channels"].update(
-                {channelId: channelName})
+            portals[portal]["fallback channels"].update({channelId: channelName})
         else:
             portals[portal]["fallback channels"].pop(channelId)
 
     savePortals(portals)
     logger.info("Playlist config saved!")
-    flash("Playlist config saved!", 'success')
+    flash("Playlist config saved!", "success")
 
     return redirect("/editor", code=302)
 
@@ -430,7 +460,7 @@ def editorReset():
 
     savePortals(portals)
     logger.info("Playlist reset!")
-    flash("Playlist reset!", 'success')
+    flash("Playlist reset!", "success")
 
     return redirect("/editor", code=302)
 
@@ -457,22 +487,23 @@ def save():
     sortGenre = request.form["sort playlist by channel genre"]
     sortName = request.form["sort playlist by channel name"]
     sortNumber = request.form["sort playlist by channel number"]
-    settings = {"ffmpeg command": ffmpeg,
-                "ffprobe timeout": ffprobe,
-                "enable hdhr": enableHdhr,
-                "hdhr name": hdhrName,
-                "hdhr tuners": hdhrTuners,
-                "enable security": enableSecurity,
-                "username": username,
-                "password": password,
-                "hdhr id": id,
-                "sort playlist by channel genre": sortGenre,
-                "sort playlist by channel name": sortName,
-                "sort playlist by channel number": sortNumber
-                }
+    settings = {
+        "ffmpeg command": ffmpeg,
+        "ffprobe timeout": ffprobe,
+        "enable hdhr": enableHdhr,
+        "hdhr name": hdhrName,
+        "hdhr tuners": hdhrTuners,
+        "enable security": enableSecurity,
+        "username": username,
+        "password": password,
+        "hdhr id": id,
+        "sort playlist by channel genre": sortGenre,
+        "sort playlist by channel name": sortName,
+        "sort playlist by channel number": sortNumber,
+    }
     saveSettings(settings)
     logger.info("Settings saved!")
-    flash("Settings saved!", 'success')
+    flash("Settings saved!", "success")
     return redirect("/settings", code=302)
 
 
@@ -539,11 +570,10 @@ def playlist():
                             + channelId
                         )
             else:
-                logger.error(
-                    "Error making playlist for {}, skipping".format(name))
+                logger.error("Error making playlist for {}, skipping".format(name))
 
     if getSettings().get("sort playlist by channel name", "true") == "true":
-        channels.sort(key=lambda k: k.split(",")[1].split('\n')[0])
+        channels.sort(key=lambda k: k.split(",")[1].split("\n")[0])
     if getSettings().get("sort playlist by channel number", "false") == "true":
         channels.sort(key=lambda k: k.split('tvg-chno="')[1].split('"')[0])
     if getSettings().get("sort playlist by channel genre", "false") == "true":
@@ -585,17 +615,14 @@ def xmltv():
                     try:
                         channelId = c.get("id")
                         if str(channelId) in enabledChannels:
-                            channelName = customChannelNames.get(
-                                str(channelId))
+                            channelName = customChannelNames.get(str(channelId))
                             if channelName == None:
                                 channelName = str(c.get("name"))
                             channelEle = ET.SubElement(
                                 channels, "channel", id=portal + channelId
                             )
-                            ET.SubElement(
-                                channelEle, "display-name").text = channelName
-                            ET.SubElement(channelEle, "icon",
-                                          src=c.get("logo"))
+                            ET.SubElement(channelEle, "display-name").text = channelName
+                            ET.SubElement(channelEle, "icon", src=c.get("logo"))
                             for p in epg.get(channelId):
                                 try:
                                     start = (
@@ -628,8 +655,7 @@ def xmltv():
                     except:
                         pass
             else:
-                logger.error(
-                    "Error making XMLTV for {}, skipping".format(name))
+                logger.error("Error making XMLTV for {}, skipping".format(name))
 
     xmltv = channels
     for programme in programmes.iter("programme"):
@@ -642,21 +668,38 @@ def xmltv():
 def channel(portalId, channelId):
     def streamData():
         def occupy():
-            o = occupied.get(portalId, {})
-            o[mac] = {"client": ip, "channel id": channelId, "channel name": channelName,
-                      "portal name": portalName, "start time": datetime.now(timezone.utc).timestamp()}
-            occupied[portalId] = o
-            logger.info(
-                "Occupied Portal({}):MAC({})".format(portalId, mac))
+            occupied.setdefault(portalId, [])
+            occupied.get(portalId, []).append(
+                {
+                    "mac": mac,
+                    "channel id": channelId,
+                    "channel name": channelName,
+                    "client": ip,
+                    "portal name": portalName,
+                    "start time": startTime,
+                }
+            )
+            logger.info("Occupied Portal({}):MAC({})".format(portalId, mac))
 
         def unoccupy():
-            o = occupied[portalId]
-            del o[mac]
-            occupied[portalId] = o
-            logger.info(
-                "Unoccupied Portal({}):MAC({})".format(portalId, mac))
+            occupied.get(portalId, []).remove(
+                {
+                    "mac": mac,
+                    "channel id": channelId,
+                    "channel name": channelName,
+                    "client": ip,
+                    "portal name": portalName,
+                    "start time": startTime,
+                }
+            )
+            logger.info("Unoccupied Portal({}):MAC({})".format(portalId, mac))
+
+        if proxy:
+            ffmpegcmd.insert(1, "-http_proxy")
+            ffmpegcmd.insert(2, proxy)
 
         try:
+            startTime = datetime.now(timezone.utc).timestamp()
             occupy()
             with subprocess.Popen(
                 ffmpegcmd,
@@ -664,10 +707,6 @@ def channel(portalId, channelId):
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
             ) as ffmpeg_sb:
-                # for chunk in iter(ffmpeg_sb.stdout.readline, ""):
-                #     yield chunk
-                #     if ffmpeg_sb.poll() is not None:
-                #         break
                 while True:
                     chunk = ffmpeg_sb.stdout.read(1024)
                     if len(chunk) == 0:
@@ -709,13 +748,14 @@ def channel(portalId, channelId):
                 macs = list(portals[portal]["macs"].keys())
                 proxy = portals[portal].get("proxy")
                 for mac in macs:
-                    if not mac in occupied.get(fPortalId, []):
+                    if streamsPerMac == 0 or isMacFree():
                         for k, v in fallbackChannels.items():
                             if v == channelName:
                                 try:
                                     token = stb.getToken(url, mac, proxy)
                                     channels = stb.getAllChannels(
-                                        url, mac, token, proxy)
+                                        url, mac, token, proxy
+                                    )
                                 except:
                                     channels = None
                                 if channels:
@@ -729,34 +769,52 @@ def channel(portalId, channelId):
                                     if cmd:
                                         if "http://localhost/" in cmd:
                                             link = stb.getLink(
-                                                url, mac, token, cmd, proxy)
+                                                url, mac, token, cmd, proxy
+                                            )
                                         else:
                                             link = cmd.split(" ")[1]
                                         if link:
                                             if testStream():
-                                                logger.info("Fallback found for Portal({}):Channel({})".format(
-                                                    portalId, channelId))
+                                                logger.info(
+                                                    "Fallback found for Portal({}):Channel({})".format(
+                                                        portalId, channelId
+                                                    )
+                                                )
                                                 return link
+
+    def isMacFree():
+        count = 0
+        for i in occupied.get(portalId, []):
+            if i["mac"] == mac:
+                count = count + 1
+        if count < streamsPerMac:
+            return True
+        else:
+            return False
 
     portal = getPortals().get(portalId)
     portalName = portal.get("name")
     url = portal.get("url")
     macs = list(portal["macs"].keys())
+    streamsPerMac = int(portal.get("streams per mac"))
     random.shuffle(macs)
     proxy = portal.get("proxy")
     web = request.args.get("web")
     ip = request.remote_addr
 
-    logger.info("IP({}) requested Portal({}):Channel({})".format(
-        ip, portalId, channelId))
+    logger.info(
+        "IP({}) requested Portal({}):Channel({})".format(ip, portalId, channelId)
+    )
 
     link = None
     freeMac = False
+    channels = False
 
     for mac in macs:
-        if not mac in occupied.get(portalId, []):
-            logger.info("Trying Portal({}):MAC({}):Channel({})".format(
-                portalId, mac, channelId))
+        if streamsPerMac == 0 or isMacFree():
+            logger.info(
+                "Trying Portal({}):MAC({}):Channel({})".format(portalId, mac, channelId)
+            )
             try:
                 token = stb.getToken(url, mac, proxy)
                 channels = stb.getAllChannels(url, mac, token, proxy)
@@ -764,15 +822,17 @@ def channel(portalId, channelId):
                 break
             except:
                 logger.info(
-                    "Unable to connect to Portal({}) using MAC({})".format(portalId, mac))
+                    "Unable to connect to Portal({}) using MAC({})".format(
+                        portalId, mac
+                    )
+                )
                 channels = None
 
     if channels:
         cmd = None
         for c in channels:
             if str(c["id"]) == channelId:
-                channelName = portal["custom channel names"].get(
-                    channelId)
+                channelName = portal["custom channel names"].get(channelId)
                 if channelName == None:
                     channelName = c["name"]
                 cmd = c["cmd"]
@@ -788,75 +848,90 @@ def channel(portalId, channelId):
                 if web:
                     ffmpegcmd = [
                         "ffmpeg",
-                        "-loglevel", "panic",
+                        "-loglevel",
+                        "panic",
                         "-hide_banner",
-                        "-i", link,
-                        "-vcodec", "copy",
-                        "-f", "mp4",
-                        "-movflags", "frag_keyframe+empty_moov",
-                        "pipe:"
+                        "-i",
+                        link,
+                        "-vcodec",
+                        "copy",
+                        "-f",
+                        "mp4",
+                        "-movflags",
+                        "frag_keyframe+empty_moov",
+                        "pipe:",
                     ]
                     return Response(streamData())
 
                 else:
                     ffmpegcmd = [
                         "ffmpeg",
-                        "-loglevel", "panic",
+                        "-loglevel",
+                        "panic",
                         "-hide_banner",
-                        "-i", link
+                        "-i",
+                        link,
                     ]
-                    ffmpegcmd.extend(
-                        getSettings()["ffmpeg command"].split())
+                    ffmpegcmd.extend(getSettings()["ffmpeg command"].split())
                     ffmpegcmd.append("pipe:")
                     return Response(streamData())
 
             elif not web:
-                logger.info("Portal({}):Channel({}) is not working. Looking for fallbacks...".format(
-                    portalId, channelId))
+                logger.info(
+                    "Portal({}):Channel({}) is not working. Looking for fallbacks...".format(
+                        portalId, channelId
+                    )
+                )
                 link = getFallback()
                 if link:
                     ffmpegcmd = [
                         "ffmpeg",
-                        "-loglevel", "panic",
+                        "-loglevel",
+                        "panic",
                         "-hide_banner",
-                        "-i", link,
+                        "-i",
+                        link,
                     ]
-                    ffmpegcmd.extend(
-                        getSettings()["ffmpeg command"].split())
+                    ffmpegcmd.extend(getSettings()["ffmpeg command"].split())
                     ffmpegcmd.append("pipe:")
                     return Response(streamData())
 
     if freeMac:
-        logger.info("No working streams found for Portal({}):Channel({})".format(
-            portalId, channelId))
+        logger.info(
+            "No working streams found for Portal({}):Channel({})".format(
+                portalId, channelId
+            )
+        )
     else:
-        logger.info("No free working MAC for Portal({}):Channel({})".format(
-            portalId, channelId))
+        logger.info(
+            "No free working MAC for Portal({}):Channel({})".format(portalId, channelId)
+        )
 
-    return make_response('No streams available', 503)
+    return make_response("No streams available", 503)
 
 
-@app.route('/dashboard')
+@app.route("/dashboard")
 @authorise
 def dashboard():
     return render_template("dashboard.html")
 
 
-@app.route('/streaming')
+@app.route("/streaming")
 @authorise
 def streaming():
     return flask.jsonify(occupied)
 
 
-@app.route('/log')
+@app.route("/log")
 @authorise
 def log():
-    with open('STB-Proxy.log') as f:
+    with open("STB-Proxy.log") as f:
         log = f.read()
     return log
 
 
 # HD Homerun #
+
 
 def hdhr(f):
     @wraps(f)
@@ -867,10 +942,16 @@ def hdhr(f):
         username = settings["username"]
         password = settings["password"]
         hdhrenabled = settings["enable hdhr"]
-        if security == "false" or auth and auth.username == username and auth.password == password:
+        if (
+            security == "false"
+            or auth
+            and auth.username == username
+            and auth.password == password
+        ):
             if hdhrenabled:
-                return f(*args, ** kwargs)
-        return make_response('Error', 404)
+                return f(*args, **kwargs)
+        return make_response("Error", 404)
+
     return decorated
 
 
@@ -891,25 +972,25 @@ def discover():
         "LineupURL": host + "/lineup.json",
         "Manufacturer": "Chris",
         "ModelNumber": "1337",
-        "TunerCount": int(tuners)
+        "TunerCount": int(tuners),
     }
     return flask.jsonify(data)
 
 
-@app.route('/lineup_status.json', methods=["GET"])
+@app.route("/lineup_status.json", methods=["GET"])
 @hdhr
 def status():
     data = {
-        'ScanInProgress': 0,
-        'ScanPossible': 0,
-        'Source': "Antenna",
-        'SourceList': ['Antenna']
+        "ScanInProgress": 0,
+        "ScanPossible": 0,
+        "Source": "Antenna",
+        "SourceList": ["Antenna"],
     }
     return flask.jsonify(data)
 
 
-@app.route('/lineup.json', methods=["GET"])
-@app.route('/lineup.post', methods=["POST"])
+@app.route("/lineup.json", methods=["GET"])
+@app.route("/lineup.post", methods=["POST"])
 @hdhr
 def lineup():
     lineup = []
@@ -943,11 +1024,20 @@ def lineup():
                         if channelNumber == None:
                             channelNumber = str(channel.get("number"))
 
-                        lineup.append({'GuideNumber': channelNumber, 'GuideName': channelName,
-                                      'URL': "http://" + host + "/play/" + portal + "/" + channelId})
+                        lineup.append(
+                            {
+                                "GuideNumber": channelNumber,
+                                "GuideName": channelName,
+                                "URL": "http://"
+                                + host
+                                + "/play/"
+                                + portal
+                                + "/"
+                                + channelId,
+                            }
+                        )
             else:
-                logger.error(
-                    "Error making lineup for {}, skipping".format(name))
+                logger.error("Error making lineup for {}, skipping".format(name))
 
     return flask.jsonify(lineup)
 

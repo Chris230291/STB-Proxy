@@ -46,10 +46,18 @@
             </tbody>
         </table>
         <br>
+        <h6>Streams Per MAC:</h6>
+        <div class="col-sm-12">
+            <div class="input-group flex-nowrap">
+                <span class="input-group-text">{{ portals[portal]["streams per mac"] }}</span>
+            </div>
+        </div>
+        <br>
         <button class="btn btn-secondary btn-block d-inline" title="Edit" data-id="{{ portal }}"
             data-name="{{ portals[portal].name }}" data-url="{{ portals[portal].url }}"
             data-proxy="{{ portals[portal].proxy }}" data-macs="{{ portals[portal].macs|join(',') }}"
-            data-bs-toggle="modal" data-bs-target="#modalEdit"><i class="fa fa-pencil"></i> Edit</button>
+            data-streamsPerMac="{{ portals[portal]['streams per mac'] }}" data-bs-toggle="modal"
+            data-bs-target="#modalEdit"><i class="fa fa-pencil"></i> Edit</button>
         <button class="btn btn-danger btn-block d-inline" title="Delete" data-portalId="{{ portal }}"
             data-portalName="{{ portals[portal].name }}" data-bs-toggle="modal" data-bs-target="#modalRemove"><i
                 class="fa fa-trash-o"></i> Delete</button>
@@ -90,6 +98,12 @@
                         <h6>MACs:</h6>
                         <input type="text" name="macs" class="form-control flex-fill" title="MACs" required>
                         <span class="text-muted">Enter a comma seperated list of MAC adresses.</span>
+                        <br>
+                        <br>
+                        <h6>Streams Per MAC:</h6>
+                        <input type="number" name="streams per mac" class="form-control flex-fill"
+                            title="Streams Per Mac" min="0" value="1" required>
+                        <span class="text-muted">How many streams does each MAC allow. 0 = unlimited.</span>
                         <br>
                         <br>
                         <div class="modal-footer">
@@ -136,6 +150,12 @@
                         <input type="text" name="macs" id="editMacs" class="form-control flex-fill" title="MACs"
                             required>
                         <span class="text-muted">Enter a comma seperated list of MAC adresses.</span>
+                        <br>
+                        <br>
+                        <h6>Streams Per MAC:</h6>
+                        <input type="number" name="streams per mac" id="editStreamsPerMac"
+                            class="form-control flex-fill" title="Streams Per MAC" min="0" required>
+                        <span class="text-muted">How many streams does each MAC allow. 0 = unlimited.</span>
                         <br>
                         <br>
                         <div class="modal-footer">
@@ -208,11 +228,13 @@
         var url = button.getAttribute('data-url')
         var proxy = button.getAttribute('data-proxy')
         var macs = button.getAttribute('data-macs')
+        var streamsPerMac = button.getAttribute('data-streamsPerMac')
         document.getElementById('editId').value = id
         document.getElementById('editName').value = name
         document.getElementById('editUrl').value = url
         document.getElementById('editProxy').value = proxy
         document.getElementById('editMacs').value = macs
+        document.getElementById('editStreamsPerMac').value = streamsPerMac
     })
 
 </script>

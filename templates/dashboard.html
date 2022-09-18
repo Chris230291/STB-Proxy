@@ -60,66 +60,65 @@
 
                 var codeBlock = ''
 
-                for (var key in json) {
-                    if (json.hasOwnProperty(key)) {
-                        for (var key2 in json[key]) {
-                            var portal = json[key][key2]["portal name"]
-                            var mac = [key2][0]
-                            var client = json[key][key2]["client"]
-                            var channel = json[key][key2]["channel name"]
-                            var start = json[key][key2]["start time"] * 1000
-                            var now = Date.now()
-                            var timeDifference = now - start;
-                            var differenceDate = new Date(timeDifference);
-                            var diffHours = differenceDate.getUTCHours();
-                            var diffMinutes = differenceDate.getUTCMinutes();
-                            var diffSeconds = differenceDate.getUTCSeconds();
-                            var dur = String(diffHours).padStart(2, '0') + ':' + String(diffMinutes).padStart(2, '0') + ':' + String(diffSeconds).padStart(2, '0');
+                for (var portal in json) {
+                    for (const stream of json[portal]) {
+                        var portal = stream["portal name"]
+                        var mac = stream["mac"]
+                        var client = stream["client"]
+                        var channel = stream["channel name"]
+                        var start = stream["start time"] * 1000
+                        var now = Date.now()
+                        var timeDifference = now - start;
+                        var differenceDate = new Date(timeDifference);
+                        var diffHours = differenceDate.getUTCHours();
+                        var diffMinutes = differenceDate.getUTCMinutes();
+                        var diffSeconds = differenceDate.getUTCSeconds();
+                        var dur = String(diffHours).padStart(2, '0') + ':' + String(diffMinutes).padStart(2, '0') + ':' + String(diffSeconds).padStart(2, '0');
 
-                            // Storing HTML code block in a variable
-                            var codeBlock = codeBlock +
-                                '<div class="col">' +
-                                '<div class="card text-dark bg-light mb-3">' +
-                                '<div class="card-header"><i class="me-2 fa fa-user"></i>' + client + '</div>' +
-                                '<div class="card-body">' +
-                                '<table class="table table-sm">' +
-                                '<tr>' +
-                                '<td>' +
-                                '<i class="fa fa-play"></i>' +
-                                '</td>' +
-                                '<td>' +
-                                '<p class="card-text text-nowrap">' + channel + '</p>' +
-                                '</td>' +
-                                '</tr>' +
-                                '<tr>' +
-                                '<td>' +
-                                '<i class="fa fa-server"></i>' +
-                                '</td>' +
-                                '<td>' +
-                                '<p class="card-text text-nowrap">' + portal + '</p>' +
-                                '</td>' +
-                                '</tr>' +
-                                '<tr>' +
-                                '<td>' +
-                                '<i class="fa fa-lock"></i>' +
-                                '</td>' +
-                                '<td>' +
-                                '<p class="card-text text-nowrap">' + mac + '</p>' +
-                                '</td>' +
-                                '<tr>' +
-                                '<td>' +
-                                '<i class="fa fa-clock-o"></i>' +
-                                '</td>' +
-                                '<td>' +
-                                '<p class="card-text text-nowrap">' + dur + '</p>' +
-                                '</td>' +
-                                '</tr>' +
-                                '</table>' +
-                                '</div>' +
-                                '</div>' +
-                                '</div>';
-                        }
+                        // Storing HTML code block in a variable
+                        var codeBlock = codeBlock +
+                            '<div class="col">' +
+                            '<div class="card text-dark bg-light mb-3">' +
+                            '<div class="card-header"><i class="me-2 fa fa-user"></i>' + client + '</div>' +
+                            '<div class="card-body">' +
+                            '<table class="table table-sm">' +
+                            '<tr>' +
+                            '<td>' +
+                            '<i class="fa fa-play"></i>' +
+                            '</td>' +
+                            '<td>' +
+                            '<p class="card-text text-nowrap">' + channel + '</p>' +
+                            '</td>' +
+                            '</tr>' +
+                            '<tr>' +
+                            '<td>' +
+                            '<i class="fa fa-server"></i>' +
+                            '</td>' +
+                            '<td>' +
+                            '<p class="card-text text-nowrap">' + portal + '</p>' +
+                            '</td>' +
+                            '</tr>' +
+                            '<tr>' +
+                            '<td>' +
+                            '<i class="fa fa-lock"></i>' +
+                            '</td>' +
+                            '<td>' +
+                            '<p class="card-text text-nowrap">' + mac + '</p>' +
+                            '</td>' +
+                            '<tr>' +
+                            '<td>' +
+                            '<i class="fa fa-clock-o"></i>' +
+                            '</td>' +
+                            '<td>' +
+                            '<p class="card-text text-nowrap">' + dur + '</p>' +
+                            '</td>' +
+                            '</tr>' +
+                            '</table>' +
+                            '</div>' +
+                            '</div>' +
+                            '</div>';
                     }
+
                 }
 
                 // Inserting the code block to wrapper element
