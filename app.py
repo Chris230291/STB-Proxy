@@ -190,7 +190,8 @@ def portalsAdd():
         try:
             token = stb.getToken(url, mac, proxy)
             expiry = stb.getExpires(url, mac, token, proxy)
-            if stb.getAllChannels(url, mac, token, proxy):
+            genres = stb.getGenres(url, mac, token, proxy)
+            if stb.getAllChannels(url, mac, token, proxy, genres):
                 working[mac] = expiry
                 logger.info(
                     "Successfully tested MAC({}) for Portal({})".format(mac, name)
@@ -240,7 +241,8 @@ def portalUpdate():
         try:
             token = stb.getToken(url, mac, proxy)
             expiry = stb.getExpires(url, mac, token, proxy)
-            if stb.getAllChannels(url, mac, token, proxy):
+            genres = stb.getGenres(url, mac, token, proxy)
+            if stb.getAllChannels(url, mac, token, proxy, genres):
                 working[mac] = expiry
                 logger.info(
                     "Successfully tested MAC({}) for Portal({})".format(mac, name)
@@ -305,8 +307,8 @@ def editor():
             for mac in macs:
                 try:
                     token = stb.getToken(url, mac, proxy)
-                    allChannels = stb.getAllChannels(url, mac, token, proxy)
                     genres = stb.getGenres(url, mac, token, proxy)
+                    allChannels = stb.getAllChannels(url, mac, token, proxy, genres)
                     break
                 except:
                     allChannels = None
@@ -527,8 +529,8 @@ def playlist():
             for mac in macs:
                 try:
                     token = stb.getToken(url, mac, proxy)
-                    allChannels = stb.getAllChannels(url, mac, token, proxy)
                     genres = stb.getGenres(url, mac, token, proxy)
+                    allChannels = stb.getAllChannels(url, mac, token, proxy, genres)
                     break
                 except:
                     allChannels = None
@@ -603,7 +605,8 @@ def xmltv():
             for mac in macs:
                 try:
                     token = stb.getToken(url, mac, proxy)
-                    allChannels = stb.getAllChannels(url, mac, token, proxy)
+                    genres = stb.getGenres(url, mac, token, proxy)
+                    allChannels = stb.getAllChannels(url, mac, token, proxy, genres)
                     epg = stb.getEpg(url, mac, token, 24, proxy)
                     break
                 except:
@@ -752,9 +755,10 @@ def channel(portalId, channelId):
                         for k, v in fallbackChannels.items():
                             if v == channelName:
                                 try:
-                                    token = stb.getToken(url, mac, proxy)
+                                    token = stb.getToken(url, mac, proxy)          
+                                    genres = stb.getGenres(url, mac, token, proxy)
                                     channels = stb.getAllChannels(
-                                        url, mac, token, proxy
+                                        url, mac, token, proxy, genres
                                     )
                                 except:
                                     channels = None
@@ -817,7 +821,8 @@ def channel(portalId, channelId):
             )
             try:
                 token = stb.getToken(url, mac, proxy)
-                channels = stb.getAllChannels(url, mac, token, proxy)
+                genres = stb.getGenres(url, mac, token, proxy)
+                channels = stb.getAllChannels(url, mac, token, proxy, genres)
                 freeMac = True
                 break
             except:
@@ -1008,7 +1013,8 @@ def lineup():
             for mac in macs:
                 try:
                     token = stb.getToken(url, mac, proxy)
-                    allChannels = stb.getAllChannels(url, mac, token, proxy)
+                    genres = stb.getGenres(url, mac, token, proxy)
+                    allChannels = stb.getAllChannels(url, mac, token, proxy, genres)
                     break
                 except:
                     allChannels = None

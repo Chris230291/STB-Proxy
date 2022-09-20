@@ -1,9 +1,10 @@
+from logging import error
 import requests
 from retrying import retry
 from urllib.parse import urlparse
 import re
 import math
-
+import json
 
 @retry(stop_max_attempt_number=4, wait_exponential_multiplier=200, wait_exponential_max=2000)
 def getUrl(url, proxy=None):
@@ -114,7 +115,7 @@ def getExpires(url, mac, token, proxy=None):
 
 
 @retry(stop_max_attempt_number=4, wait_exponential_multiplier=200, wait_exponential_max=2000)
-def getAllChannels(url, mac, token, proxy=None):
+def getAllChannels(url, mac, token, proxy=None, genres=None):
     proxies = {"http": proxy, "https": proxy}
     cookies = {"mac": mac, "stb_lang": "en", "timezone": "Europe/London"}
     headers = {
@@ -130,6 +131,27 @@ def getAllChannels(url, mac, token, proxy=None):
             proxies=proxies
         )
         channels = response.json()["js"]["data"]
+        if genres:
+            adults_genres = [k for k, v in genres.items() if 'Adult' in v or 'XXX'in v]
+            try: 
+                for value in adults_genres:
+                    for numbers in range(50):
+                        print(numbers)
+                        response = requests.get(
+                        url
+                        + f'?type=itv&action=get_ordered_list&genre={value}&p={numbers}&JsHttpRequest=1-xml',
+                        cookies=cookies,
+                        headers=headers,
+                        proxies=proxies
+                        )
+                        if response.json()["js"]["data"]:
+                            adults = response.json()["js"]["data"]
+                            channels += adults
+            
+            except Exception as err: 
+                print(f"New Error Ocurred: {err}")
+                pass
+
         if channels:
             return channels
     except:
