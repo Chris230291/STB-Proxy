@@ -136,7 +136,6 @@ def getAllChannels(url, mac, token, proxy=None, genres=None):
             try: 
                 for value in adults_genres:
                     for numbers in range(50):
-                        print(numbers)
                         response = requests.get(
                         url
                         + f'?type=itv&action=get_ordered_list&genre={value}&p={numbers}&JsHttpRequest=1-xml',
