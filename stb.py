@@ -146,7 +146,6 @@ def getAllChannels(url, mac, token, proxy=None, genres=None):
                         if response.json()["js"]["data"]:
                             adults = response.json()["js"]["data"]
                             channels += adults
-            
             except Exception as err: 
                 print(f"New Error Ocurred: {err}")
                 pass
