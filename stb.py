@@ -41,9 +41,9 @@ def getUrl(url, proxy=None):
                 response = None
             if response:
                 return parseResponse(url + i, response)
-    except:
+    except Exception as err:
         pass
-    raise Exception("Error getting portal URL")
+    raise Exception(f"Error getting Portal URL: {err}")
 
 
 @retry(stop_max_attempt_number=4, wait_exponential_multiplier=200, wait_exponential_max=2000)
@@ -63,9 +63,9 @@ def getToken(url, mac, proxy=None):
         if token:
             getProfile(url, mac, token, proxy)
             return token
-    except:
+    except Exception as err:
         pass
-    raise Exception("Error getting token")
+    raise Exception(f"Error getting token: {err}")
 
 
 @retry(stop_max_attempt_number=4, wait_exponential_multiplier=200, wait_exponential_max=2000)
@@ -86,10 +86,9 @@ def getProfile(url, mac, token, proxy=None):
         data = response.json()
         if data:
             return data
-    except:
+    except Exception as err:
         pass
-    raise Exception("Error getting profile")
-
+    raise Exception(f"Error getting profile: {err}")
 
 def getExpires(url, mac, token, proxy=None):
     proxies = {"http": proxy, "https": proxy}
@@ -111,7 +110,7 @@ def getExpires(url, mac, token, proxy=None):
             return expire
     except:
         pass
-    return "Unkown"
+    return "Unknown"
 
 
 @retry(stop_max_attempt_number=4, wait_exponential_multiplier=200, wait_exponential_max=2000)
@@ -132,7 +131,7 @@ def getAllChannels(url, mac, token, proxy=None, genres=None):
         )
         channels = response.json()["js"]["data"]
         if genres:
-            adults_genres = [k for k, v in genres.items() if 'Adult' in v or 'XXX'in v]
+            adults_genres = [k for k, v in genres.items() if 'adult' in v.lower() or 'xxx'in v.lower() or 'porn' in v.lower()]
             try: 
                 for value in adults_genres:
                     for numbers in range(50):
@@ -146,15 +145,16 @@ def getAllChannels(url, mac, token, proxy=None, genres=None):
                         if response.json()["js"]["data"]:
                             adults = response.json()["js"]["data"]
                             channels += adults
-            except Exception as err: 
-                print(f"New Error Ocurred: {err}")
-                pass
+            except Exception as err:
+                raise Exception(f"New Error Ocurred when getting Adult Playlist: {err}")
+            finally:
+                pass  
 
         if channels:
             return channels
-    except:
+    except Exception as err:
         pass
-    raise Exception("Error getting channels")
+    raise Exception(f"Error getting channels: {err}")
 
 
 @retry(stop_max_attempt_number=4, wait_exponential_multiplier=200, wait_exponential_max=2000)
@@ -180,10 +180,10 @@ def getGenres(url, mac, token, proxy=None):
             genres[gid] = name
         if genres:
             return genres
-    except:
+            
+    except Exception as err:
         pass
-    raise Exception("Error getting genres")
-
+    raise Exception(f"Error getting genres: {err}")
 
 @retry(stop_max_attempt_number=4, wait_exponential_multiplier=200, wait_exponential_max=2000)
 def getLink(url, mac, token, cmd, proxy=None):
@@ -205,10 +205,9 @@ def getLink(url, mac, token, cmd, proxy=None):
         link = data["js"]["cmd"].split()[-1]
         if link:
             return link
-    except:
+    except Exception as err:
         pass
-    raise Exception("Error getting link")
-
+    raise Exception(f"Error getting link: {err}")
 
 @retry(stop_max_attempt_number=4, wait_exponential_multiplier=200, wait_exponential_max=2000)
 def getEpg(url, mac, token, period, proxy=None):
@@ -229,9 +228,9 @@ def getEpg(url, mac, token, period, proxy=None):
         data = response.json()["js"]["data"]
         if data:
             return data
-    except:
+    except Exception as err:
         pass
-    raise Exception("Found no EPG data")
+    raise Exception(f"Error data EPG not found: {err}")
 
 
 def getVods(url, mac, token, proxy=None):
@@ -264,9 +263,9 @@ def getVods(url, mac, token, proxy=None):
             vods = vods + response.json()["js"]["data"]
         if vods:
             return vods
-    except:
+    except Exception as err:
         pass
-    raise Exception("Found no VOD data")
+    raise Exception(f"Error VOD(Movies) data not found: {err}")
 
 
 @retry(stop_max_attempt_number=4, wait_exponential_multiplier=200, wait_exponential_max=2000)
@@ -288,9 +287,9 @@ def getVodLink(url, mac, token, cmd, proxy=None):
         link = data["js"]["cmd"].split()[-1]
         if link:
             return link
-    except:
+    except Exception as err:
         pass
-    raise Exception("Error getting link")
+    raise Exception(f"Error VOD link: {err}")
 
 
 def getSeries(url, mac, token, proxy=None):
@@ -310,9 +309,9 @@ def getSeries(url, mac, token, proxy=None):
         data = response.json()["js"]
         if data:
             return data
-    except:
+    except Exception as err:
         pass
-    raise Exception("Found no VOD data")
+    raise Exception(f"Error VOD(TVShows) data not found: {err}")
 
 
 def test(url, mac, token, proxy=None):
@@ -332,6 +331,6 @@ def test(url, mac, token, proxy=None):
         data = response.json()["js"]
         if data:
             return data
-    except:
+    except Exception as err:
         pass
-    raise Exception("Found no VOD data")
+    raise Exception(f"Error VOD data not found: {err}")
