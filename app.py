@@ -840,11 +840,18 @@ def channel(portalId, channelId):
                 channelName = portal["custom channel names"].get(channelId)
                 if channelName == None:
                     channelName = c["name"]
-                cmd = c["cmd"]
+                    if c["cmds"]: 
+                        data = c["cmds"]
+                        raw = data[0]["url"]
+                        cmd = raw.replace("ffmpeg http : //localhost/", "http://localhost/")
+                    else:
+                        cmd = c["cmd"]
                 break
-
+        
         if cmd:
             if "http://localhost/" in cmd:
+                
+                token = stb.getToken(url, mac, proxy)
                 link = stb.getLink(url, mac, token, cmd, proxy)
             else:
                 link = cmd.split(" ")[1]

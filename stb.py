@@ -75,6 +75,7 @@ def getProfile(url, mac, token, proxy=None):
     headers = {
         "User-Agent": "Mozilla/5.0 (QtEmbedded; U; Linux; C)",
         "Authorization": "Bearer " + token,
+        "X-User-Agent": "Model: MAG250; Link: WiFi",
     }
     try:
         response = requests.get(
@@ -96,6 +97,7 @@ def getExpires(url, mac, token, proxy=None):
     headers = {
         "User-Agent": "Mozilla/5.0 (QtEmbedded; U; Linux; C)",
         "Authorization": "Bearer " + token,
+        "X-User-Agent": "Model: MAG250; Link: WiFi",
     }
     try:
         response = requests.get(
@@ -120,6 +122,7 @@ def getAllChannels(url, mac, token, proxy=None, genres=None):
     headers = {
         "User-Agent": "Mozilla/5.0 (QtEmbedded; U; Linux; C)",
         "Authorization": "Bearer " + token,
+        "X-User-Agent": "Model: MAG250; Link: WiFi",
     }
     try:
         response = requests.get(
@@ -130,25 +133,27 @@ def getAllChannels(url, mac, token, proxy=None, genres=None):
             proxies=proxies
         )
         channels = response.json()["js"]["data"]
+
         if genres:
             adults_genres = [k for k, v in genres.items() if 'adult' in v.lower() or 'xxx'in v.lower() or 'porn' in v.lower()]
-            try: 
-                for value in adults_genres:
-                    for numbers in range(50):
-                        response = requests.get(
-                        url
-                        + f'?type=itv&action=get_ordered_list&genre={value}&p={numbers}&JsHttpRequest=1-xml',
-                        cookies=cookies,
-                        headers=headers,
-                        proxies=proxies
-                        )
-                        if response.json()["js"]["data"]:
-                            adults = response.json()["js"]["data"]
-                            channels += adults
-            except Exception as err:
-                raise Exception(f"New Error Ocurred when getting Adult Playlist: {err}")
-            finally:
-                pass  
+            if adults_genres:
+                try: 
+                    for value in adults_genres:
+                        for numbers in range(50):
+                            response = requests.get(
+                            url
+                            + f'?type=itv&action=get_ordered_list&genre={value}&p={numbers}&JsHttpRequest=1-xml',
+                            cookies=cookies,
+                            headers=headers,
+                            proxies=proxies
+                            )
+                            if response.json()["js"]["data"]:
+                                adults = response.json()["js"]["data"]
+                                channels += adults
+                except Exception as err:
+                    print(f"New Error Ocurred when getting Adult Playlist: {err}")
+                finally:
+                    pass  
 
         if channels:
             return channels
@@ -164,6 +169,7 @@ def getGenres(url, mac, token, proxy=None):
     headers = {
         "User-Agent": "Mozilla/5.0 (QtEmbedded; U; Linux; C)",
         "Authorization": "Bearer " + token,
+        "X-User-Agent": "Model: MAG250; Link: WiFi",
     }
     try:
         response = requests.get(
@@ -190,8 +196,10 @@ def getLink(url, mac, token, cmd, proxy=None):
     proxies = {"http": proxy, "https": proxy}
     cookies = {"mac": mac, "stb_lang": "en", "timezone": "Europe/London"}
     headers = {
-        "User-Agent": "Mozilla/5.0 (QtEmbedded; U; Linux; C)",
+        "User-Agent": "Mozilla/5.0 (QtEmbedded; U; Linux; C) AppleWebKit/533.3 (KHTML, like Gecko) MAG200 stbapp ver: 2 rev: 250 Safari/533.3",
         "Authorization": "Bearer " + token,
+        "X-User-Agent": "Model: MAG250; Link: WiFi",
+        "Host": "magnum-ott.net",
     }
     try:
         response = requests.get(
@@ -216,6 +224,7 @@ def getEpg(url, mac, token, period, proxy=None):
     headers = {
         "User-Agent": "Mozilla/5.0 (QtEmbedded; U; Linux; C)",
         "Authorization": "Bearer " + token,
+        "X-User-Agent": "Model: MAG250; Link: WiFi",
     }
     try:
         response = requests.get(
@@ -239,6 +248,7 @@ def getVods(url, mac, token, proxy=None):
     headers = {
         "User-Agent": "Mozilla/5.0 (QtEmbedded; U; Linux; C)",
         "Authorization": "Bearer " + token,
+        "X-User-Agent": "Model: MAG250; Link: WiFi",
     }
     try:
         response = requests.get(
@@ -275,6 +285,7 @@ def getVodLink(url, mac, token, cmd, proxy=None):
     headers = {
         "User-Agent": "Mozilla/5.0 (QtEmbedded; U; Linux; C)",
         "Authorization": "Bearer " + token,
+        "X-User-Agent": "Model: MAG250; Link: WiFi",
     }
     try:
         response = requests.get(
@@ -298,6 +309,7 @@ def getSeries(url, mac, token, proxy=None):
     headers = {
         "User-Agent": "Mozilla/5.0 (QtEmbedded; U; Linux; C)",
         "Authorization": "Bearer " + token,
+        "X-User-Agent": "Model: MAG250; Link: WiFi",
     }
     try:
         response = requests.get(
@@ -320,6 +332,7 @@ def test(url, mac, token, proxy=None):
     headers = {
         "User-Agent": "Mozilla/5.0 (QtEmbedded; U; Linux; C)",
         "Authorization": "Bearer " + token,
+        "X-User-Agent": "Model: MAG250; Link: WiFi",
     }
     try:
         response = requests.get(
