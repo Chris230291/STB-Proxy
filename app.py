@@ -850,10 +850,7 @@ def channel(portalId, channelId):
         
         if cmd:
             if "http://localhost/" in cmd:
-                
-                token = stb.getToken(url, mac, proxy)
                 link = stb.getLink(url, mac, token, cmd, proxy)
-                print(link)
             else:
                 link = cmd.split(" ")[1]
 
