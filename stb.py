@@ -151,7 +151,7 @@ def getAllChannels(url, mac, token, proxy=None, genres=None):
                                 adults = response.json()["js"]["data"]
                                 channels += adults
                 except Exception as err:
-                    print(f"New Error Ocurred when getting Adult Playlist: {err}")
+                    pass
                 finally:
                     pass  
 
