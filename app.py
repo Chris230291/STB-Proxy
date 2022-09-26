@@ -306,7 +306,7 @@ def editor():
                 try:
                     token = stb.getToken(url, mac, proxy)
                     allChannels = stb.getAllChannels(url, mac, token, proxy)
-                    genres = stb.getGenres(url, mac, token, proxy)
+                    genres = stb.getGenreNames(url, mac, token, proxy)
                     break
                 except:
                     allChannels = None
@@ -317,7 +317,7 @@ def editor():
                     channelId = str(channel["id"])
                     channelName = str(channel["name"])
                     channelNumber = str(channel["number"])
-                    genre = str(genres.get(channel["tv_genre_id"]))
+                    genre = str(genres.get(str(channel["tv_genre_id"])))
                     if channelId in enabledChannels:
                         enabled = True
                     else:
@@ -528,7 +528,7 @@ def playlist():
                 try:
                     token = stb.getToken(url, mac, proxy)
                     allChannels = stb.getAllChannels(url, mac, token, proxy)
-                    genres = stb.getGenres(url, mac, token, proxy)
+                    genres = stb.getGenreNames(url, mac, token, proxy)
                     break
                 except:
                     allChannels = None
