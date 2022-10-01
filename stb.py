@@ -210,7 +210,7 @@ def getLink(url, mac, token, cmd, proxy=None):
             proxies=proxies
         )
         data = response.json()
-        link = data["js"]["cmd"].split()[-1]
+        link = data["js"]["cmd"].split()[-1] + "'"
         if link:
             return link
     except Exception as err:
