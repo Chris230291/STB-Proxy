@@ -510,6 +510,7 @@ def save():
 
 
 @app.route("/playlist", methods=["GET"])
+@authorise
 def playlist():
     channels = []
     portals = getPortals()
