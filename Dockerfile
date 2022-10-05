@@ -9,7 +9,8 @@ ENV CACHE=/cache/
 RUN apk add \
 	py3-pip \
 	ffmpeg \
-	tzdata
+	tzdata \
+	python3
 
 RUN pip3 install \
 	flask \
