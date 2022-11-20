@@ -73,7 +73,7 @@ def getConfig():
     data["settings"].setdefault("use channel numbers", "true")
     data["settings"].setdefault("stream method", "ffmpeg")
     data["settings"].setdefault("ffmpeg command", "-vcodec copy -acodec copy -f mpegts")
-    data["settings"].setdefault("ffprobe timeout", "5")
+    data["settings"].setdefault("ffmpeg timeout", "5")
     data["settings"].setdefault("test streams", "true")
     data["settings"].setdefault("enable hdhr", "false")
     data["settings"].setdefault("hdhr name", "STB-Proxy")
@@ -82,6 +82,10 @@ def getConfig():
     data["settings"].setdefault("enable security", "false")
     data["settings"].setdefault("username", "admin")
     data["settings"].setdefault("password", "12345")
+    if not data["settings"]["ffmpeg command"].startswith("ffmpeg"):
+        data["settings"][
+            "ffmpeg command"
+        ] = "ffmpeg -loglevel panic -hide_banner -http_proxy <proxy> -timeout <timeout> -i <url> -vcodec copy -acodec copy -f mpegts pipe:"
 
     portals = data.get("portals")
     for portal in portals:
@@ -466,7 +470,7 @@ def save():
     settings = {
         "stream method": request.form["stream method"],
         "ffmpeg command": request.form["ffmpeg command"],
-        "ffprobe timeout": request.form["ffprobe timeout"],
+        "ffmpeg timeout": request.form["ffmpeg timeout"],
         "test streams": request.form["test streams"],
         "enable hdhr": request.form["enable hdhr"],
         "hdhr name": request.form["hdhr name"],
@@ -711,7 +715,7 @@ def channel(portalId, channelId):
             ffmpeg_sp.kill()
 
     def testStream():
-        timeout = int(getSettings()["ffprobe timeout"]) * int(1000000)
+        timeout = int(getSettings()["ffmpeg timeout"]) * int(1000000)
         ffprobecmd = ["ffprobe", "-timeout", str(timeout), "-i", link]
 
         if proxy:
@@ -865,7 +869,8 @@ def channel(portalId, channelId):
                     ffmpegcmd = ffmpegcmd = str(getSettings()["ffmpeg command"])
                     ffmpegcmd = ffmpegcmd.replace("<url>", link)
                     ffmpegcmd = ffmpegcmd.replace(
-                        "<timeout>", str(int(getSettings()["ffprobe timeout"]) * int(1000000))
+                        "<timeout>",
+                        str(int(getSettings()["ffmpeg timeout"]) * int(1000000)),
                     )
                     if proxy:
                         ffmpegcmd = ffmpegcmd.replace("<proxy>", proxy)
