@@ -9,6 +9,11 @@
     <br>
 
     <form id="save" action="/settings/save" method="post"></form>
+    <input form="save" type="text" name="test streams" id="test streams" value="{{ settings['test streams'] }}" hidden>
+    <input form="save" type="text" name="use channel numbers" id="use channel numbers"
+        value="{{ settings['use channel numbers'] }}" hidden>
+    <input form="save" type="text" name="use channel genres" id="use channel genres"
+        value="{{ settings['use channel genres'] }}" hidden>
     <input form="save" type="text" name="sort playlist by channel genre" id="sort playlist by channel genre"
         value="{{ settings['sort playlist by channel genre'] }}" hidden>
     <input form="save" type="text" name="sort playlist by channel number" id="sort playlist by channel number"
@@ -19,26 +24,34 @@
     <input form="save" type="text" name="enable security" id="enable security" value="{{ settings['enable security'] }}"
         hidden>
 
-    <h4>FFmpeg</h4>
+    <h4>Streaming</h4>
     <hr>
     <div class="p-sm-3">
-        <h6>Command:</h6>
+        <h6>Streaming Method:</h6>
+        <div class="col-md-2">
+            <select class="form-select" title="Update Time" form="save" id="stream method" name="stream method"
+                required>
+                <option {{ "selected" if settings['stream method']=="ffmpeg" }} value="ffmpeg">FFMpeg</option>
+                <option {{ "selected" if settings['stream method']=="redirect" }} value="redirect">Redirect</option>
+            </select>
+        </div>
+        <span class="text-muted">FFMpeg is required to keep track of accounts and ensure only x users per MAC.</span>
+        <br>
+        <br>
+        <h6>FFMpeg Command:</h6>
         <div class="col-md-12">
             <div class="input-group flex-nowrap">
-                <span class="input-group-text">ffmpeg -loglevel panic -hide_banner -http_proxy *proxy* -i
-                    *link*</span>
                 <input form="save" type="text" name="ffmpeg command" id="ffmpeg command" class="form-control"
                     value="{{ settings['ffmpeg command'] }}" required>
-                <span class="input-group-text">pipe:</span>
                 <button class="btn btn-danger btn-block" title="Reset"><i class="fa fa-undo"
                         onclick="resetDefault(this)" data-input="ffmpeg command"
-                        data-default="-vcodec copy -acodec copy -f mpegts"></i></button>
+                        data-default="ffmpeg -loglevel panic -hide_banner -http_proxy <proxy> -timeout <timeout> -i <url> -vcodec copy -acodec copy -f mpegts pipe:"></i></button>
             </div>
         </div>
-        <span class="text-muted">Edit with caution! Check FFmpeg documentation for help.</span>
+        <span class="text-muted">Edit with caution! Check FFmpeg documentation for help.<br>'&lt;proxy&gt;', '&lt;url&gt;', and '&lt;timeout&gt;' are the available variables.</span>
         <br>
         <br>
-        <h6>Timeout:</h6>
+        <h6>FFMpeg Timeout:</h6>
         <div class="col-md-2">
             <div class="input-group flex-nowrap">
                 <input form="save" type="number" name="ffprobe timeout" id="ffprobe timeout" class="form-control"
@@ -48,6 +61,16 @@
             </div>
         </div>
         <span class="text-muted">Seconds to wait for a stream before giving up.</span>
+        <br>
+        <br>
+        <h6>Test Streams:</h6>
+        <div class="col-md-2">
+            <div class="form-check form-switch">
+                <input type="checkbox" class="checkbox form-check-input" onchange="enable(this)" {{ "checked" if
+                    settings['test streams']=='true' }} data-input="test streams">
+            </div>
+        </div>
+        <span class="text-muted">This is required for the fallback system to work.</span>
     </div>
 
     <br>
@@ -55,27 +78,37 @@
     <h4>Playlist</h4>
     <hr>
     <div class="p-sm-3">
-        <h6>Sort by genre:</h6>
-        <div class="col-md-12">
-            <div class="form-check form-switch">
-                <input type="checkbox" class="checkbox form-check-input" onchange="enable(this)" {{ "checked" if
-                    settings['sort playlist by channel genre']=='true' }} data-input="sort playlist by channel genre">
-            </div>
-            <br>
-            <h6>Sort by number:</h6>
-            <div class="form-check form-switch">
-                <input type="checkbox" class="checkbox form-check-input" onchange="enable(this)" {{ "checked" if
-                    settings['sort playlist by channel number']=='true' }} data-input="sort playlist by channel number">
-            </div>
-            <br>
-            <h6>Sort by name:</h6>
-            <div class="form-check form-switch">
-                <input type="checkbox" class="checkbox form-check-input" onchange="enable(this)" {{ "checked" if
-                    settings['sort playlist by channel name']=='true' }} data-input="sort playlist by channel name">
-            </div>
+        <h6>Use channel genres:</h6>
+        <div class="form-check form-switch">
+            <input type="checkbox" class="checkbox form-check-input" onchange="enable(this)" {{ "checked" if
+                settings['use channel genres']=='true' }} data-input="use channel genres">
         </div>
-        <span class="text-muted">Sorting options stack and are applied: Genre > Number > Name<br>Without any sorting the
-            channels are listed as the server lists them</span>
+        <br>
+        <h6>Use channel numbers:</h6>
+        <div class="form-check form-switch">
+            <input type="checkbox" class="checkbox form-check-input" onchange="enable(this)" {{ "checked" if
+                settings['use channel numbers']=='true' }} data-input="use channel numbers">
+        </div>
+        <br>
+        <h6>Sort by genre:</h6>
+        <div class="form-check form-switch">
+            <input type="checkbox" class="checkbox form-check-input" onchange="enable(this)" {{ "checked" if
+                settings['sort playlist by channel genre']=='true' }} data-input="sort playlist by channel genre">
+        </div>
+        <br>
+        <h6>Sort by number:</h6>
+        <div class="form-check form-switch">
+            <input type="checkbox" class="checkbox form-check-input" onchange="enable(this)" {{ "checked" if
+                settings['sort playlist by channel number']=='true' }} data-input="sort playlist by channel number">
+        </div>
+        <br>
+        <h6>Sort by name:</h6>
+        <div class="form-check form-switch">
+            <input type="checkbox" class="checkbox form-check-input" onchange="enable(this)" {{ "checked" if
+                settings['sort playlist by channel name']=='true' }} data-input="sort playlist by channel name">
+        </div>
+        <span class="text-muted">Sorting options stack and are applied: Genre > Number > Name.<br>Without any sorting
+            the channels are listed as the server lists them.</span>
     </div>
 
     <br>
@@ -100,7 +133,7 @@
             <input form="save" type="text" name="password" id="password" class="form-control"
                 value="{{ settings['password'] }}" title="Password" required>
         </div>
-        <span class="text-muted">Recommended if STB-Proxy is exposed to the internet or on a public network</span>
+        <span class="text-muted">Recommended if STB-Proxy is exposed to the internet or on a public network.</span>
     </div>
 
     <br>
