@@ -33,7 +33,7 @@ chris230291/stb-proxy:latest
 
 # Without Docker
 
-- Requires: `python 3` `flask` `requests` `retrying` `ffmpeg`
+- Requires: `python 3` `flask` `requests` `ffmpeg`
 - Download the repo
 - Doubble click `app.py`
 - Go to `http://localhost:8001` in a browser and enter Portal URL + MAC
