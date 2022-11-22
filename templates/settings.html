@@ -45,7 +45,7 @@
                     value="{{ settings['ffmpeg command'] }}" required>
                 <button class="btn btn-danger btn-block" title="Reset"><i class="fa fa-undo"
                         onclick="resetDefault(this)" data-input="ffmpeg command"
-                        data-default="ffmpeg -loglevel panic -hide_banner -http_proxy <proxy> -timeout <timeout> -i <url> -vcodec copy -acodec copy -f mpegts pipe:"></i></button>
+                        data-default="{{ d_ffmpegcmd }}"></i></button>
             </div>
         </div>
         <span class="text-muted">Edit with caution! Check FFmpeg documentation for help.<br>'&lt;proxy&gt;', '&lt;url&gt;', and '&lt;timeout&gt;' are the available variables.</span>

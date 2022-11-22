@@ -19,6 +19,7 @@ from datetime import datetime, timezone
 from functools import wraps
 import secrets
 import random
+import waitress
 
 app = Flask(__name__)
 app.secret_key = secrets.token_urlsafe(32)
@@ -54,6 +55,8 @@ else:
 occupied = {}
 config = {}
 
+d_ffmpegcmd = "ffmpeg -re -http_proxy <proxy> -timeout <timeout> -i <url> -map 0 -codec copy -f mpegts pipe:"
+
 
 def getConfig():
     try:
@@ -83,9 +86,7 @@ def getConfig():
     data["settings"].setdefault("username", "admin")
     data["settings"].setdefault("password", "12345")
     if not data["settings"]["ffmpeg command"].startswith("ffmpeg"):
-        data["settings"][
-            "ffmpeg command"
-        ] = "ffmpeg -loglevel panic -hide_banner -http_proxy <proxy> -timeout <timeout> -i <url> -vcodec copy -acodec copy -f mpegts pipe:"
+        data["settings"]["ffmpeg command"] = d_ffmpegcmd
 
     portals = data.get("portals")
     for portal in portals:
@@ -461,7 +462,7 @@ def editorReset():
 @authorise
 def settings():
     settings = getSettings()
-    return render_template("settings.html", settings=settings)
+    return render_template("settings.html", settings=settings, d_ffmpegcmd=d_ffmpegcmd)
 
 
 @app.route("/settings/save", methods=["POST"])
@@ -862,7 +863,7 @@ def channel(portalId, channelId):
                 if proxy:
                     ffmpegcmd.insert(1, "-http_proxy")
                     ffmpegcmd.insert(2, proxy)
-                return Response(streamData())
+                return Response(streamData(), mimetype="application/octet-stream")
 
             else:
                 if getSettings().get("stream method", "ffmpeg") == "ffmpeg":
@@ -878,7 +879,7 @@ def channel(portalId, channelId):
                         ffmpegcmd = ffmpegcmd.replace("-http_proxy <proxy>", "")
                     " ".join(ffmpegcmd.split())  # cleans up multiple whitespaces
                     ffmpegcmd = ffmpegcmd.split()
-                    return Response(streamData())
+                    return Response(streamData(), mimetype="application/octet-stream")
                 else:
                     logger.info("Redirect sent")
                     return redirect(link)
@@ -903,7 +904,7 @@ def channel(portalId, channelId):
                 ffmpegcmd.append("pipe:")
 
                 if getSettings().get("stream method", "ffmpeg") == "ffmpeg":
-                    return Response(streamData())
+                    return Response(streamData(), mimetype="application/octet-stream")
                 else:
                     logger.info("Redirect sent")
                     return redirect(link)
@@ -1057,5 +1058,5 @@ def lineup():
 
 if __name__ == "__main__":
     config = getConfig()
-    # waitress.serve(app, port=8001, _quiet=True)
-    app.run(host="0.0.0.0", port=8001, debug=debug)
+    waitress.serve(app, port=8001, _quiet=True)
+    #app.run(host="0.0.0.0", port=8001, debug=debug)
