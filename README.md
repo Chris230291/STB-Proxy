@@ -12,31 +12,9 @@
 - Set fallback channels
 - Support for multiple MACs/Streams per Portal
 
-# Docker
-- Map whichever port you like to the default `8001`
-- `HOST` should be the docker hosts ip + the port you chose
-- Mounting `/config` is required for settings to persist through restarts
-- To configure go to the HOST + port in a browser eg 10.0.1.200:8084
+# Setup
+Take a look at the [wiki](https://github.com/Chris230291/STB-Proxy/wiki)
 
-example:
-```
-docker create \
---name=STB-Proxy \
---restart=always \
--p 8084:8001 \
--e HOST=10.0.1.200:8084 \
--e DEBUG=False \
--e TZ=Europe/London \
--v </host/path>:/config \
-chris230291/stb-proxy:latest
-```
-
-# Without Docker
-
-- Requires: `python 3` `flask` `requests` `ffmpeg`
-- Download the repo
-- Doubble click `app.py`
-- Go to `http://localhost:8001` in a browser and enter Portal URL + MAC
 
 # Note
 
