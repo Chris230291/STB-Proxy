@@ -88,20 +88,6 @@ def getConfig():
     if not data["settings"]["ffmpeg command"].startswith("ffmpeg"):
         data["settings"]["ffmpeg command"] = d_ffmpegcmd
 
-    portals = data.get("portals")
-    for portal in portals:
-        portals[portal].setdefault("name", "")
-        portals[portal].setdefault("url", "")
-        portals[portal].setdefault("macs", [])
-        portals[portal].setdefault("streams per mac", 1),
-        portals[portal].setdefault("proxy", "")
-        portals[portal].setdefault("enabled channels", [])
-        portals[portal].setdefault("custom channel numbers", {})
-        portals[portal].setdefault("custom channel names", {})
-        portals[portal].setdefault("custom genres", {})
-        portals[portal].setdefault("custom epg ids", {})
-        portals[portal].setdefault("fallback channels", {})
-
     with open(configFile, "w") as f:
         json.dump(data, f, indent=4)
 
@@ -288,12 +274,12 @@ def editor():
             url = portals[portal]["url"]
             macs = list(portals[portal]["macs"].keys())
             proxy = portals[portal]["proxy"]
-            enabledChannels = portals[portal]["enabled channels"]
-            customChannelNames = portals[portal]["custom channel names"]
-            customGenres = portals[portal]["custom genres"]
-            customChannelNumbers = portals[portal]["custom channel numbers"]
-            customEpgIds = portals[portal]["custom epg ids"]
-            fallbackChannels = portals[portal]["fallback channels"]
+            enabledChannels = portals[portal].get("enabled channels", [])
+            customChannelNames = portals[portal].get("custom channel names", {})
+            customGenres = portals[portal].get("custom genres", {})
+            customChannelNumbers = portals[portal].get("custom channel numbers", {})
+            customEpgIds = portals[portal].get("custom epg ids", {})
+            fallbackChannels = portals[portal].get("fallback channels", {})
 
             for mac in macs:
                 try:
@@ -381,6 +367,7 @@ def editorSave():
         channelId = edit["channel id"]
         enabled = edit["enabled"]
         if enabled:
+            portals[portal].setdefault("enabled channels", [])
             portals[portal]["enabled channels"].append(channelId)
         else:
             portals[portal]["enabled channels"] = list(
@@ -392,6 +379,7 @@ def editorSave():
         channelId = edit["channel id"]
         customNumber = edit["custom number"]
         if customNumber:
+            portals[portal].setdefault("custom channel numbers", {})
             portals[portal]["custom channel numbers"].update({channelId: customNumber})
         else:
             portals[portal]["custom channel numbers"].pop(channelId)
@@ -401,6 +389,7 @@ def editorSave():
         channelId = edit["channel id"]
         customName = edit["custom name"]
         if customName:
+            portals[portal].setdefault("custom channel names", {})
             portals[portal]["custom channel names"].update({channelId: customName})
         else:
             portals[portal]["custom channel names"].pop(channelId)
@@ -410,6 +399,7 @@ def editorSave():
         channelId = edit["channel id"]
         customGenre = edit["custom genre"]
         if customGenre:
+            portals[portal].setdefault("custom genres", {})
             portals[portal]["custom genres"].update({channelId: customGenre})
         else:
             portals[portal]["custom genres"].pop(channelId)
@@ -419,6 +409,7 @@ def editorSave():
         channelId = edit["channel id"]
         customEpgId = edit["custom epg id"]
         if customEpgId:
+            portals[portal].setdefault("custom epg ids", {})
             portals[portal]["custom epg ids"].update({channelId: customEpgId})
         else:
             portals[portal]["custom epg ids"].pop(channelId)
@@ -428,6 +419,7 @@ def editorSave():
         channelId = edit["channel id"]
         channelName = edit["channel name"]
         if channelName:
+            portals[portal].setdefault("fallback channels", {})
             portals[portal]["fallback channels"].update({channelId: channelName})
         else:
             portals[portal]["fallback channels"].pop(channelId)
@@ -502,16 +494,16 @@ def playlist():
     channels = []
     portals = getPortals()
     for portal in portals:
-        enabledChannels = portals[portal]["enabled channels"]
+        enabledChannels = portals[portal].get("enabled channels", [])
         if len(enabledChannels) != 0:
             name = portals[portal]["name"]
             url = portals[portal]["url"]
             macs = list(portals[portal]["macs"].keys())
             proxy = portals[portal]["proxy"]
-            customChannelNames = portals[portal]["custom channel names"]
-            customGenres = portals[portal]["custom genres"]
-            customChannelNumbers = portals[portal]["custom channel numbers"]
-            customEpgIds = portals[portal]["custom epg ids"]
+            customChannelNames = portals[portal].get("custom channel names", {})
+            customGenres = portals[portal].get("custom genres", {})
+            customChannelNumbers = portals[portal].get("custom channel numbers", {})
+            customEpgIds = portals[portal].get("custom epg ids", {})
 
             for mac in macs:
                 try:
@@ -592,13 +584,14 @@ def xmltv():
     programmes = ET.Element("tv")
     portals = getPortals()
     for portal in portals:
-        enabledChannels = portals[portal]["enabled channels"]
+        enabledChannels = portals[portal].get("enabled channels", [])
         if len(enabledChannels) != 0:
             name = portals[portal]["name"]
             url = portals[portal]["url"]
             macs = list(portals[portal]["macs"].keys())
             proxy = portals[portal]["proxy"]
-            customChannelNames = portals[portal]["custom channel names"]
+            customChannelNames = portals[portal].get("custom channel names", {})
+            customEpgIds = portals[portal].get("custom epg ids", {})
 
             for mac in macs:
                 try:
@@ -619,9 +612,10 @@ def xmltv():
                             channelName = customChannelNames.get(str(channelId))
                             if channelName == None:
                                 channelName = str(c.get("name"))
-                            channelEle = ET.SubElement(
-                                channels, "channel", id=portal + channelId
-                            )
+                            epgId = customEpgIds.get(channelId)
+                            if epgId == None:
+                                epgId = portal + channelId
+                            channelEle = ET.SubElement(channels, "channel", id=epgId)
                             ET.SubElement(channelEle, "display-name").text = channelName
                             ET.SubElement(channelEle, "icon", src=c.get("logo"))
                             for p in epg.get(channelId):
@@ -643,7 +637,7 @@ def xmltv():
                                         "programme",
                                         start=start,
                                         stop=stop,
-                                        channel=portal + channelId,
+                                        channel=epgId,
                                     )
                                     ET.SubElement(programmeEle, "title").text = p.get(
                                         "name"
@@ -1009,14 +1003,14 @@ def lineup():
     lineup = []
     portals = getPortals()
     for portal in portals:
-        enabledChannels = portals[portal]["enabled channels"]
+        enabledChannels = portals[portal].get("enabled channels", [])
         if len(enabledChannels) != 0:
             name = portals[portal]["name"]
             url = portals[portal]["url"]
             macs = list(portals[portal]["macs"].keys())
             proxy = portals[portal]["proxy"]
-            customChannelNames = portals[portal]["custom channel names"]
-            customChannelNumbers = portals[portal]["custom channel numbers"]
+            customChannelNames = portals[portal].get("custom channel names", {})
+            customChannelNumbers = portals[portal].get("custom channel numbers", {})
 
             for mac in macs:
                 try:
@@ -1059,4 +1053,4 @@ def lineup():
 if __name__ == "__main__":
     config = getConfig()
     waitress.serve(app, port=8001, _quiet=True)
-    #app.run(host="0.0.0.0", port=8001, debug=debug)
+    # app.run(host="0.0.0.0", port=8001, debug=debug)
