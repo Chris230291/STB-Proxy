@@ -231,6 +231,8 @@ def portalUpdate():
                     "Successfully tested MAC({}) for Portal({})".format(mac, name),
                     "success",
                 )
+            else:
+                raise Exception
         except:
             logger.error("Error testing MAC({}) for Portal({})".format(mac, name))
             flash("Error testing MAC({}) for Portal({})".format(mac, name), "danger")
