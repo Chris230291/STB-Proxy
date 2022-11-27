@@ -168,17 +168,19 @@ def portalsAdd():
     for mac in macs:
         try:
             token = stb.getToken(url, mac, proxy)
-            if token:
-                if stb.getProfile(url, mac, token, proxy)["status"] == 0:
-                    expiry = stb.getExpires(url, mac, token, proxy)
-                    working[mac] = expiry
-                    logger.info(
-                        "Successfully tested MAC({}) for Portal({})".format(mac, name)
-                    )
-                    flash(
-                        "Successfully tested MAC({}) for Portal({})".format(mac, name),
-                        "success",
-                    )
+            stb.getProfile(url, mac, token, proxy)
+            if stb.getAllChannels(url, mac, token, proxy):
+                expiry = stb.getExpires(url, mac, token, proxy)
+                working[mac] = expiry
+                logger.info(
+                    "Successfully tested MAC({}) for Portal({})".format(mac, name)
+                )
+                flash(
+                    "Successfully tested MAC({}) for Portal({})".format(mac, name),
+                    "success",
+                )
+            else:
+                raise Exception
         except:
             logger.error("Error testing MAC({}) for Portal({})".format(mac, name))
             flash("Error testing MAC({}) for Portal({})".format(mac, name), "danger")
@@ -218,17 +220,17 @@ def portalUpdate():
     for mac in macs:
         try:
             token = stb.getToken(url, mac, proxy)
-            if token:
-                if stb.getProfile(url, mac, token, proxy)["status"] == 0:
-                    expiry = stb.getExpires(url, mac, token, proxy)
-                    working[mac] = expiry
-                    logger.info(
-                        "Successfully tested MAC({}) for Portal({})".format(mac, name)
-                    )
-                    flash(
-                        "Successfully tested MAC({}) for Portal({})".format(mac, name),
-                        "success",
-                    )
+            stb.getProfile(url, mac, token, proxy)
+            if stb.getAllChannels(url, mac, token, proxy):
+                expiry = stb.getExpires(url, mac, token, proxy)
+                working[mac] = expiry
+                logger.info(
+                    "Successfully tested MAC({}) for Portal({})".format(mac, name)
+                )
+                flash(
+                    "Successfully tested MAC({}) for Portal({})".format(mac, name),
+                    "success",
+                )
         except:
             logger.error("Error testing MAC({}) for Portal({})".format(mac, name))
             flash("Error testing MAC({}) for Portal({})".format(mac, name), "danger")
@@ -824,7 +826,7 @@ def channel(portalId, channelId):
     if channels:
         for c in channels:
             if str(c["id"]) == channelId:
-                channelName = portal["custom channel names"].get(channelId)
+                channelName = portal.get("custom channel names", {}).get(channelId)
                 if channelName == None:
                     channelName = c["name"]
                 cmd = c["cmd"]
