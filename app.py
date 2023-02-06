@@ -660,7 +660,7 @@ def xmltv():
     for programme in programmes.iter("programme"):
         xmltv.append(programme)
 
-    return Response(ET.tostring(xmltv, encoding="unicode"), mimetype="text/xml")
+    return Response(ET.tostring(xmltv, encoding='utf-8', xml_declaration=True), mimetype="text/xml")
 
 
 @app.route("/play/<portalId>/<channelId>", methods=["GET"])
