@@ -78,6 +78,7 @@ def getConfig():
     data["settings"].setdefault("ffmpeg command", "-vcodec copy -acodec copy -f mpegts")
     data["settings"].setdefault("ffmpeg timeout", "5")
     data["settings"].setdefault("test streams", "true")
+    data["settings"].setdefault("test all macs", "false")
     data["settings"].setdefault("enable hdhr", "false")
     data["settings"].setdefault("hdhr name", "STB-Proxy")
     data["settings"].setdefault("hdhr id", uuid.uuid4().hex)
@@ -469,6 +470,7 @@ def save():
         "ffmpeg command": request.form["ffmpeg command"],
         "ffmpeg timeout": request.form["ffmpeg timeout"],
         "test streams": request.form["test streams"],
+        "test all macs": request.form["test all macs"],
         "enable hdhr": request.form["enable hdhr"],
         "hdhr name": request.form["hdhr name"],
         "hdhr tuners": request.form["hdhr tuners"],
@@ -733,50 +735,6 @@ def channel(portalId, channelId):
             else:
                 return False
 
-    def getFallback():
-        portals = getPortals()
-        for portal in portals:
-            fallbackChannels = portals[portal]["fallback channels"]
-            if channelName in fallbackChannels.values():
-                url = portals[portal].get("url")
-                macs = list(portals[portal]["macs"].keys())
-                proxy = portals[portal].get("proxy")
-                for mac in macs:
-                    if streamsPerMac == 0 or isMacFree():
-                        for k, v in fallbackChannels.items():
-                            if v == channelName:
-                                try:
-                                    token = stb.getToken(url, mac, proxy)
-                                    stb.getProfile(url, mac, token, proxy)
-                                    channels = stb.getAllChannels(
-                                        url, mac, token, proxy
-                                    )
-                                except:
-                                    channels = None
-                                if channels:
-                                    cmd = None
-                                    link = None
-                                    fChannelId = k
-                                    for c in channels:
-                                        if str(c["id"]) == fChannelId:
-                                            cmd = c["cmd"]
-                                            break
-                                    if cmd:
-                                        if "http://localhost/" in cmd:
-                                            link = stb.getLink(
-                                                url, mac, token, cmd, proxy
-                                            )
-                                        else:
-                                            link = cmd.split(" ")[1]
-                                        if link:
-                                            if testStream():
-                                                logger.info(
-                                                    "Fallback found for Portal({}):Channel({})".format(
-                                                        portalId, channelId
-                                                    )
-                                                )
-                                                return link
-
     def isMacFree():
         count = 0
         for i in occupied.get(portalId, []):
@@ -802,11 +760,11 @@ def channel(portalId, channelId):
     )
 
     freeMac = False
-    channels = False
-    cmd = None
-    link = None
 
     for mac in macs:
+        channels = False
+        cmd = None
+        link = None
         if streamsPerMac == 0 or isMacFree():
             logger.info(
                 "Trying Portal({}):MAC({}):Channel({})".format(portalId, mac, channelId)
@@ -816,96 +774,139 @@ def channel(portalId, channelId):
                 stb.getProfile(url, mac, token, proxy)
                 channels = stb.getAllChannels(url, mac, token, proxy)
                 freeMac = True
-                break
             except:
                 logger.info(
                     "Unable to connect to Portal({}) using MAC({})".format(
                         portalId, mac
                     )
                 )
-                channels = None
 
-    if channels:
-        for c in channels:
-            if str(c["id"]) == channelId:
-                channelName = portal.get("custom channel names", {}).get(channelId)
-                if channelName == None:
-                    channelName = c["name"]
-                cmd = c["cmd"]
-                break
+        if channels:
+            for c in channels:
+                if str(c["id"]) == channelId:
+                    channelName = portal.get("custom channel names", {}).get(channelId)
+                    if channelName == None:
+                        channelName = c["name"]
+                    cmd = c["cmd"]
+                    break
 
-    if cmd:
-        if "http://localhost/" in cmd:
-            link = stb.getLink(url, mac, token, cmd, proxy)
-        else:
-            link = cmd.split(" ")[1]
-
-    if link:
-        if getSettings().get("test streams", "true") == "false" or testStream():
-            if web:
-                ffmpegcmd = [
-                    "ffmpeg",
-                    "-loglevel",
-                    "panic",
-                    "-hide_banner",
-                    "-i",
-                    link,
-                    "-vcodec",
-                    "copy",
-                    "-f",
-                    "mp4",
-                    "-movflags",
-                    "frag_keyframe+empty_moov",
-                    "pipe:",
-                ]
-                if proxy:
-                    ffmpegcmd.insert(1, "-http_proxy")
-                    ffmpegcmd.insert(2, proxy)
-                return Response(streamData(), mimetype="application/octet-stream")
-
+        if cmd:
+            if "http://localhost/" in cmd:
+                link = stb.getLink(url, mac, token, cmd, proxy)
             else:
-                if getSettings().get("stream method", "ffmpeg") == "ffmpeg":
-                    ffmpegcmd = ffmpegcmd = str(getSettings()["ffmpeg command"])
-                    ffmpegcmd = ffmpegcmd.replace("<url>", link)
-                    ffmpegcmd = ffmpegcmd.replace(
-                        "<timeout>",
-                        str(int(getSettings()["ffmpeg timeout"]) * int(1000000)),
-                    )
+                link = cmd.split(" ")[1]
+
+        if link:
+            if getSettings().get("test streams", "true") == "false" or testStream():
+                if web:
+                    ffmpegcmd = [
+                        "ffmpeg",
+                        "-loglevel",
+                        "panic",
+                        "-hide_banner",
+                        "-i",
+                        link,
+                        "-vcodec",
+                        "copy",
+                        "-f",
+                        "mp4",
+                        "-movflags",
+                        "frag_keyframe+empty_moov",
+                        "pipe:",
+                    ]
                     if proxy:
-                        ffmpegcmd = ffmpegcmd.replace("<proxy>", proxy)
+                        ffmpegcmd.insert(1, "-http_proxy")
+                        ffmpegcmd.insert(2, proxy)
+                    return Response(streamData(), mimetype="application/octet-stream")
+
+                else:
+                    if getSettings().get("stream method", "ffmpeg") == "ffmpeg":
+                        ffmpegcmd = str(getSettings()["ffmpeg command"])
+                        ffmpegcmd = ffmpegcmd.replace("<url>", link)
+                        ffmpegcmd = ffmpegcmd.replace(
+                            "<timeout>",
+                            str(int(getSettings()["ffmpeg timeout"]) * int(1000000)),
+                        )
+                        if proxy:
+                            ffmpegcmd = ffmpegcmd.replace("<proxy>", proxy)
+                        else:
+                            ffmpegcmd = ffmpegcmd.replace("-http_proxy <proxy>", "")
+                        " ".join(ffmpegcmd.split())  # cleans up multiple whitespaces
+                        ffmpegcmd = ffmpegcmd.split()
+                        return Response(streamData(), mimetype="application/octet-stream")
                     else:
-                        ffmpegcmd = ffmpegcmd.replace("-http_proxy <proxy>", "")
-                    " ".join(ffmpegcmd.split())  # cleans up multiple whitespaces
-                    ffmpegcmd = ffmpegcmd.split()
-                    return Response(streamData(), mimetype="application/octet-stream")
-                else:
-                    logger.info("Redirect sent")
-                    return redirect(link)
+                        logger.info("Redirect sent")
+                        return redirect(link)
 
-        elif not web:
-            logger.info(
-                "Portal({}):Channel({}) is not working. Looking for fallbacks...".format(
-                    portalId, channelId
-                )
+        if not getSettings().get("test all macs", "false") == "true":
+            break
+
+    if not web:
+        logger.info(
+            "Portal({}):Channel({}) is not working. Looking for fallbacks...".format(
+                portalId, channelId
             )
-            link = getFallback()
-            if link:
-                ffmpegcmd = [
-                    "ffmpeg",
-                    "-loglevel",
-                    "panic",
-                    "-hide_banner",
-                    "-i",
-                    link,
-                ]
-                ffmpegcmd.extend(getSettings()["ffmpeg command"].split())
-                ffmpegcmd.append("pipe:")
-
-                if getSettings().get("stream method", "ffmpeg") == "ffmpeg":
-                    return Response(streamData(), mimetype="application/octet-stream")
-                else:
-                    logger.info("Redirect sent")
-                    return redirect(link)
+        )
+        
+        portals = getPortals()
+        for portal in portals:
+            fallbackChannels = portals[portal]["fallback channels"]
+            if channelName in fallbackChannels.values():
+                url = portals[portal].get("url")
+                macs = list(portals[portal]["macs"].keys())
+                proxy = portals[portal].get("proxy")
+                for mac in macs:
+                    channels = None                                        
+                    cmd = None
+                    link = None
+                    if streamsPerMac == 0 or isMacFree():
+                        for k, v in fallbackChannels.items():
+                            if v == channelName:
+                                try:
+                                    token = stb.getToken(url, mac, proxy)
+                                    stb.getProfile(url, mac, token, proxy)
+                                    channels = stb.getAllChannels(
+                                        url, mac, token, proxy
+                                    )
+                                except:
+                                    pass
+                                if channels:
+                                    fChannelId = k
+                                    for c in channels:
+                                        if str(c["id"]) == fChannelId:
+                                            cmd = c["cmd"]
+                                            break
+                                    if cmd:
+                                        if "http://localhost/" in cmd:
+                                            link = stb.getLink(
+                                                url, mac, token, cmd, proxy
+                                            )
+                                        else:
+                                            link = cmd.split(" ")[1]
+                                        if link:
+                                            if testStream():
+                                                logger.info(
+                                                    "Fallback found for Portal({}):Channel({})".format(
+                                                        portalId, channelId
+                                                    )
+                                                )
+                                                if getSettings().get("stream method", "ffmpeg") == "ffmpeg":
+                                                    ffmpegcmd = str(getSettings()["ffmpeg command"])
+                                                    ffmpegcmd = ffmpegcmd.replace("<url>", link)
+                                                    ffmpegcmd = ffmpegcmd.replace(
+                                                        "<timeout>",
+                                                        str(int(getSettings()["ffmpeg timeout"]) * int(1000000)),
+                                                    )
+                                                    if proxy:
+                                                        ffmpegcmd = ffmpegcmd.replace("<proxy>", proxy)
+                                                    else:
+                                                        ffmpegcmd = ffmpegcmd.replace("-http_proxy <proxy>", "")
+                                                    " ".join(ffmpegcmd.split())  # cleans up multiple whitespaces
+                                                    ffmpegcmd = ffmpegcmd.split()
+                                                    return Response(streamData(), mimetype="application/octet-stream")
+                                                else:
+                                                    logger.info("Redirect sent")
+                                                    return redirect(link)
 
     if freeMac:
         logger.info(
