@@ -1,4 +1,4 @@
-FROM alpine:latest
+FROM --platform=$TARGETPLATFORM alpine:latest
 
 ENV HOST=localhost
 
