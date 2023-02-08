@@ -78,7 +78,7 @@ def getConfig():
     data["settings"].setdefault("ffmpeg command", "-vcodec copy -acodec copy -f mpegts")
     data["settings"].setdefault("ffmpeg timeout", "5")
     data["settings"].setdefault("test streams", "true")
-    data["settings"].setdefault("test all macs", "false")
+    data["settings"].setdefault("try all macs", "false")
     data["settings"].setdefault("enable hdhr", "false")
     data["settings"].setdefault("hdhr name", "STB-Proxy")
     data["settings"].setdefault("hdhr id", uuid.uuid4().hex)
@@ -470,7 +470,7 @@ def save():
         "ffmpeg command": request.form["ffmpeg command"],
         "ffmpeg timeout": request.form["ffmpeg timeout"],
         "test streams": request.form["test streams"],
-        "test all macs": request.form["test all macs"],
+        "try all macs": request.form["try all macs"],
         "enable hdhr": request.form["enable hdhr"],
         "hdhr name": request.form["hdhr name"],
         "hdhr tuners": request.form["hdhr tuners"],
@@ -838,7 +838,7 @@ def channel(portalId, channelId):
                         logger.info("Redirect sent")
                         return redirect(link)
 
-        if not getSettings().get("test all macs", "false") == "true":
+        if not getSettings().get("try all macs", "false") == "true":
             break
 
     if not web:

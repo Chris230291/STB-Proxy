@@ -10,7 +10,7 @@
 
     <form id="save" action="/settings/save" method="post"></form>
     <input form="save" type="text" name="test streams" id="test streams" value="{{ settings['test streams'] }}" hidden>
-    <input form="save" type="text" name="test all macs" id="test all macs" value="{{ settings['test all macs'] }}" hidden>
+    <input form="save" type="text" name="try all macs" id="try all macs" value="{{ settings['try all macs'] }}" hidden>
     <input form="save" type="text" name="use channel numbers" id="use channel numbers"
         value="{{ settings['use channel numbers'] }}" hidden>
     <input form="save" type="text" name="use channel genres" id="use channel genres"
@@ -74,14 +74,14 @@
         <span class="text-muted">This is required for the fallback system to work.</span>
         <br>
         <br>
-        <h6>Test All MAC's:</h6>
+        <h6>Try All MAC's:</h6>
         <div class="col-md-2">
             <div class="form-check form-switch">
                 <input type="checkbox" class="checkbox form-check-input" onchange="enable(this)" {{ "checked" if
-                    settings['test all macs']=='true' }} data-input="test all macs">
+                    settings['try all macs']=='true' }} data-input="try all macs">
             </div>
         </div>
-        <span class="text-muted">Test all MAC's before looking for a fallback.</span>
+        <span class="text-muted">Try all MAC's before looking for a fallback.</span>
     </div>
 
     <br>
