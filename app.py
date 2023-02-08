@@ -662,7 +662,10 @@ def xmltv():
     for programme in programmes.iter("programme"):
         xmltv.append(programme)
 
-    return Response(ET.tostring(xmltv, encoding="unicode", xml_declaration=True), mimetype="text/xml")
+    return Response(
+        ET.tostring(xmltv, encoding="unicode", xml_declaration=True),
+        mimetype="text/xml",
+    )
 
 
 @app.route("/play/<portalId>/<channelId>", methods=["GET"])
@@ -833,7 +836,9 @@ def channel(portalId, channelId):
                             ffmpegcmd = ffmpegcmd.replace("-http_proxy <proxy>", "")
                         " ".join(ffmpegcmd.split())  # cleans up multiple whitespaces
                         ffmpegcmd = ffmpegcmd.split()
-                        return Response(streamData(), mimetype="application/octet-stream")
+                        return Response(
+                            streamData(), mimetype="application/octet-stream"
+                        )
                     else:
                         logger.info("Redirect sent")
                         return redirect(link)
@@ -847,7 +852,7 @@ def channel(portalId, channelId):
                 portalId, channelId
             )
         )
-        
+
         portals = getPortals()
         for portal in portals:
             fallbackChannels = portals[portal]["fallback channels"]
@@ -856,7 +861,7 @@ def channel(portalId, channelId):
                 macs = list(portals[portal]["macs"].keys())
                 proxy = portals[portal].get("proxy")
                 for mac in macs:
-                    channels = None                                        
+                    channels = None
                     cmd = None
                     link = None
                     if streamsPerMac == 0 or isMacFree():
@@ -890,20 +895,45 @@ def channel(portalId, channelId):
                                                         portalId, channelId
                                                     )
                                                 )
-                                                if getSettings().get("stream method", "ffmpeg") == "ffmpeg":
-                                                    ffmpegcmd = str(getSettings()["ffmpeg command"])
-                                                    ffmpegcmd = ffmpegcmd.replace("<url>", link)
+                                                if (
+                                                    getSettings().get(
+                                                        "stream method", "ffmpeg"
+                                                    )
+                                                    == "ffmpeg"
+                                                ):
+                                                    ffmpegcmd = str(
+                                                        getSettings()["ffmpeg command"]
+                                                    )
+                                                    ffmpegcmd = ffmpegcmd.replace(
+                                                        "<url>", link
+                                                    )
                                                     ffmpegcmd = ffmpegcmd.replace(
                                                         "<timeout>",
-                                                        str(int(getSettings()["ffmpeg timeout"]) * int(1000000)),
+                                                        str(
+                                                            int(
+                                                                getSettings()[
+                                                                    "ffmpeg timeout"
+                                                                ]
+                                                            )
+                                                            * int(1000000)
+                                                        ),
                                                     )
                                                     if proxy:
-                                                        ffmpegcmd = ffmpegcmd.replace("<proxy>", proxy)
+                                                        ffmpegcmd = ffmpegcmd.replace(
+                                                            "<proxy>", proxy
+                                                        )
                                                     else:
-                                                        ffmpegcmd = ffmpegcmd.replace("-http_proxy <proxy>", "")
-                                                    " ".join(ffmpegcmd.split())  # cleans up multiple whitespaces
+                                                        ffmpegcmd = ffmpegcmd.replace(
+                                                            "-http_proxy <proxy>", ""
+                                                        )
+                                                    " ".join(
+                                                        ffmpegcmd.split()
+                                                    )  # cleans up multiple whitespaces
                                                     ffmpegcmd = ffmpegcmd.split()
-                                                    return Response(streamData(), mimetype="application/octet-stream")
+                                                    return Response(
+                                                        streamData(),
+                                                        mimetype="application/octet-stream",
+                                                    )
                                                 else:
                                                     logger.info("Redirect sent")
                                                     return redirect(link)
