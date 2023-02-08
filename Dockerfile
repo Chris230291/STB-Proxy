@@ -1,7 +1,6 @@
-FROM --platform=$TARGETPLATFORM alpine:latest
+FROM --platform=$TARGETPLATFORM ghcr.io/linuxserver/baseimage-alpine:3.16
 
 ENV HOST=localhost
-
 ENV CONFIG=/config/config.json
 
 RUN apk add \
