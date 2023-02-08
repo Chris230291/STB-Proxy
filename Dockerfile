@@ -1,4 +1,4 @@
-FROM --platform=$TARGETPLATFORM alpine:latest
+FROM alpine:latest
 
 ENV HOST=localhost
 ENV CONFIG=/config/config.json
