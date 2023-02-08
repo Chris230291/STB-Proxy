@@ -1,4 +1,4 @@
-FROM --platform=$TARGETPLATFORM ghcr.io/linuxserver/baseimage-alpine:3.16
+FROM --platform=$TARGETPLATFORM alpine:latest
 
 ENV HOST=localhost
 ENV CONFIG=/config/config.json
