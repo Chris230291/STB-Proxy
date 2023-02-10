@@ -43,15 +43,6 @@
                     <li class="nav-item">
                         <a class="nav-link" href="/dashboard"><i class="fa fa-dashboard"></i> Dashboard</a>
                     </li>
-                    <!-- <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" id="navbarDarkDropdownMenuLink" role="button" data-bs-toggle="dropdown"><i class="fa fa-file-video-o"></i> M3U
-                        </a>
-                        <ul class="dropdown-menu">
-                          <li><a class="dropdown-item" target="_blank" href="/playlist">TV</a></li>
-                          <li><a class="dropdown-item" href="#">Movies</a></li>
-                          <li><a class="dropdown-item" href="#">Series</a></li>
-                        </ul>
-                      </li> -->
                     <li class="nav-item">
                         <a class="nav-link" target="_blank" href="/playlist"><i class="fa fa-file-video-o"></i>
                             Playlist</a>
@@ -80,9 +71,22 @@
 </html>
 
 <script>
+    // remove flash after delay
     window.setTimeout(function () {
         $(".alert").fadeTo(500, 0).slideUp(500, function () {
             $(this).remove();
         });
     }, 4000);
+
+    // remove sticky focus on buttons
+    $(".btn").mouseup(function () {
+        $(this).blur();
+    })
+
+    // prevent enter submitting forms
+    $(document).on("keydown", ":input:not(textarea)", function (event) {
+        if (event.key == "Enter") {
+            event.preventDefault();
+        }
+    });
 </script>

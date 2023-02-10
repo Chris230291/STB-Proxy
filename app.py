@@ -271,6 +271,12 @@ def portalRemove():
 @app.route("/editor", methods=["GET"])
 @authorise
 def editor():
+    return render_template("editor.html")
+
+
+@app.route("/editor_data", methods=["GET"])
+@authorise
+def editor_data():
     channels = []
     portals = getPortals()
     if len(portals) > 0:
@@ -354,7 +360,9 @@ def editor():
                     "danger",
                 )
 
-    return render_template("editor.html", channels=channels)
+    data = {"data": channels}
+
+    return flask.jsonify(data)
 
 
 @app.route("/editor/save", methods=["POST"])
