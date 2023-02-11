@@ -12,14 +12,22 @@
 - Set fallback channels
 - Support for multiple MACs/Streams per Portal
 
+
 # Setup
-Take a look at the [wiki](https://github.com/Chris230291/STB-Proxy/wiki)
 
+Install the latest Docker image with...
 
-# Note
+```
+docker create \
+--name=STB-Proxy \
+--restart=always \
+-p 8084:8001 \
+-e HOST=10.0.1.200:8084 \
+-v </host/path>:/config \
+chris230291/stb-proxy:latest
+```
 
-I am not a programmer. Most of the stuff involved with getting this working (excluding some basic python knowledge) I learnt while putting this app together. If you see any room for improvement please make suggestions and/or pull requests.
-
-
-[![](https://www.paypalobjects.com/en_GB/i/btn/btn_donate_LG.gif)](https://www.paypal.com/donate/?hosted_button_id=62MYXSBT75D4E)
-
+Map whichever port you like to the default `8001`
+`HOST` should be the docker hosts ip + the port you chose
+Mounting `/config` is required for settings to persist through restarts
+To configure go to the `HOST` in a browser eg 10.0.1.200:8084
