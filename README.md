@@ -27,7 +27,7 @@ docker create \
 chris230291/stb-proxy:latest
 ```
 
-Map whichever port you like to the default `8001`
-`HOST` should be the docker hosts ip + the port you chose
-Mounting `/config` is required for settings to persist through restarts
-To configure go to the `HOST` in a browser eg 10.0.1.200:8084
+- Map whichever port you like to the default `8001`
+- `HOST` should be the docker hosts ip + the port you chose
+- Mounting `/config` is required for settings to persist through restarts
+- To configure go to the `HOST` in a browser eg 10.0.1.200:8084
