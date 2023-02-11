@@ -208,13 +208,14 @@
             autoWidth: true,
             lengthMenu: [[25, 50, 100, -1], [25, 50, 100, "All"]],
             columnDefs: [
-                { targets: 0, orderable: false, searchable: false, orderDataType: "dom-checkbox" },
-                { targets: 1, orderable: false, searchable: false },
-                { targets: 2, orderDataType: "dom-text", type: 'string' },
-                { targets: 3, orderDataType: "dom-text", type: 'string' },
-                { targets: 4, orderDataType: "dom-text-numeric", type: 'string' },
-                { targets: 5, orderDataType: "dom-text", type: 'string' },
-                { targets: 6, orderDataType: "dom-text", type: 'string' }
+                { targets: 0, className: "align-middle", orderable: false, searchable: false, orderDataType: "dom-checkbox" },
+                { targets: 1, className: "align-middle", orderable: false, searchable: false },
+                { targets: 2, className: "align-middle", orderDataType: "dom-text", type: 'string' },
+                { targets: 3, className: "align-middle", orderDataType: "dom-text", type: 'string' },
+                { targets: 4, className: "align-middle", orderDataType: "dom-text-numeric" },
+                { targets: 5, className: "align-middle", orderDataType: "dom-text", type: 'string' },
+                { targets: 6, className: "align-middle", orderDataType: "dom-text", type: 'string' },
+                { targets: 7, className: "align-middle" }
             ],
             language: {
                 search: "",
