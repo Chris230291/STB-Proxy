@@ -1,240 +1,208 @@
 {% extends "base.html" %}
 {% block content %}
 
-<div class="container-fluid text-light px-lg-5 pb-lg-5">
-    <div class="mt-sm-3">
+<div class="container-fluid m-lg-5">
+
+    <div>
         <button class="btn btn-success btn-block" title="Add Portal" data-bs-toggle="modal"
             data-bs-target="#modalAdd"><i class="fa fa-plus"></i> Add Portal</button>
     </div>
+
     <br>
 
-    {% if portals is not none %}
-    {% for portal in portals %}
-    <h4>{{ portals[portal].name }}</h4>
-    <hr>
-    <div class="p-sm-3">
-        <h6>URL:</h6>
-        <div class="col-sm-12">
-            <div class="input-group flex-nowrap">
-                <span class="input-group-text">{{ portals[portal].url }}</span>
+    <div class="row row-cols-auto" id="streamOut">
+
+
+        {% if portals is not none %}
+        {% for portal in portals %}
+
+        <div class="col">
+
+            <div class="card text-dark bg-light mb-3">
+                <div class="card-header btn text-start stretched-link" data-id="{{ portal }}"
+                    data-name="{{ portals[portal].name }}" data-url="{{ portals[portal].url }}"
+                    data-proxy="{{ portals[portal].proxy }}" data-macs="{{ portals[portal].macs|join(',') }}"
+                    data-streamsPerMac="{{ portals[portal]['streams per mac'] }}" data-bs-toggle="modal"
+                    data-bs-target="#modalEdit">
+                    <i class="me-2 fa fa-server"></i>{{ portals[portal].name }}
+                </div>
+                <div class="card-body">
+                    <table class="table table-sm mt-2">
+                        {% for key, value in portals[portal].macs.items() %}
+                        <tr>
+                            <td><span>{{key.upper()}}</span></td>
+                            <td><span>:</span></td>
+                            <td><span name="expiryString">{{value}}</span></td>
+
+                        </tr>
+                        {% endfor %}
+                    </table>
+                </div>
             </div>
+
         </div>
-        <br>
-        {% if portals[portal].proxy %}
-        <h6>Proxy:</h6>
-        <div class="col-lg-2">
-            <div class="input-group flex-nowrap">
-                <span class="input-group-text">{{ portals[portal].proxy }}</span>
-            </div>
-        </div>
-        <br>
+
+        {% endfor %}
         {% endif %}
-        {% if portals[portal].macs|length > 1 %}
-        <h6>MACs:</h6>
-        {% else %}
-        <h6>MAC:</h6>
-        {% endif %}
-        <table>
-            <tbody>
-                {% for key, value in portals[portal].macs.items() %}
-                <tr>
-                    <td><span class="input-group-text">{{key}}</span></td>
-                    <td class="p-2" name="expiryString">{{value}}</td>
 
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-        <br>
-        <h6>Streams Per MAC:</h6>
-        <div class="col-sm-12">
-            <div class="input-group flex-nowrap">
-                <span class="input-group-text">{{ portals[portal]["streams per mac"] }}</span>
-            </div>
-        </div>
-        <br>
-        <button class="btn btn-secondary btn-block d-inline" title="Edit" data-id="{{ portal }}"
-            data-name="{{ portals[portal].name }}" data-url="{{ portals[portal].url }}"
-            data-proxy="{{ portals[portal].proxy }}" data-macs="{{ portals[portal].macs|join(',') }}"
-            data-streamsPerMac="{{ portals[portal]['streams per mac'] }}" data-bs-toggle="modal"
-            data-bs-target="#modalEdit"><i class="fa fa-pencil"></i> Edit</button>
-        <button class="btn btn-danger btn-block d-inline" title="Delete" data-portalId="{{ portal }}"
-            data-portalName="{{ portals[portal].name }}" data-bs-toggle="modal" data-bs-target="#modalRemove"><i
-                class="fa fa-trash-o"></i> Delete</button>
-    </div>
-    <br>
-    <br>
-    {% endfor %}
-    {% else %}
-    {% endif %}
-
-    <!-- Add Modal -->
-    <div class="modal fade text-dark" id="modalAdd" tabindex="-1">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Add Portal</h5>
-                </div>
-                <div class="modal-body">
-
-                    <form action="/portal/add" method="post">
-                        <h6>Name:</h6>
-                        <input type="text" name="name" class="form-control flex-fill" title="Name" required>
-                        <span class="text-muted">Give this portal a name.</span>
-                        <br>
-                        <br>
-                        <h6>URL:</h6>
-                        <input type="text" name="url" class="form-control flex-fill" title="URL" required>
-                        <span class="text-muted">Its best to enter the full address ending in .php if you know
-                            it.<br>If
-                            not STB-Proxy will attempt to figure it out for you.</span>
-                        <br>
-                        <br>
-                        <h6>Proxy:</h6>
-                        <input type="text" name="proxy" class="form-control flex-fill" title="Proxy">
-                        <span class="text-muted">STB-Proxy supports HTML proxies only.</span>
-                        <br>
-                        <br>
-                        <h6>MACs:</h6>
-                        <input type="text" name="macs" class="form-control flex-fill" title="MACs" required>
-                        <span class="text-muted">Enter a comma seperated list of MAC adresses.</span>
-                        <br>
-                        <br>
-                        <h6>Streams Per MAC:</h6>
-                        <input type="number" name="streams per mac" class="form-control flex-fill"
-                            title="Streams Per Mac" min="0" value="1" required>
-                        <span class="text-muted">How many streams does each MAC allow. 0 = unlimited.</span>
-                        <br>
-                        <br>
-                        <div class="modal-footer">
-                            <button class="btn btn-secondary" title="Cancel" data-bs-dismiss="modal">Cancel</button>
-                            <button class="btn btn-success btn-block" title="Add">Add</button>
-                        </div>
-                    </form>
-
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Edit Modal -->
-    <div class="modal fade text-dark" id="modalEdit" tabindex="-1">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Edit Portal</h5>
-                </div>
-                <div class="modal-body">
-
-                    <form action="/portal/update" method="post">
-                        <input name="id" id="editId" class="form-control flex-fill" hidden>
-                        <h6>Name:</h6>
-                        <input type="text" name="name" id="editName" class="form-control flex-fill" title="Name"
-                            required>
-                        <span class="text-muted">Give this portal a name.</span>
-                        <br>
-                        <br>
-                        <h6>URL:</h6>
-                        <input type="text" name="url" id="editUrl" class="form-control flex-fill" title="URL" required>
-                        <span class="text-muted">Its best to enter the full address ending in .php if you know
-                            it.<br>If
-                            not STB-Proxy will attempt to figure it out for you.</span>
-                        <br>
-                        <br>
-                        <h6>Proxy:</h6>
-                        <input type="text" name="proxy" id="editProxy" class="form-control flex-fill" title="Proxy">
-                        <span class="text-muted">STB-Proxy supports HTML proxies only.</span>
-                        <br>
-                        <br>
-                        <h6>MACs:</h6>
-                        <input type="text" name="macs" id="editMacs" class="form-control flex-fill" title="MACs"
-                            required>
-                        <span class="text-muted">Enter a comma seperated list of MAC adresses.</span>
-                        <br>
-                        <br>
-                        <h6>Streams Per MAC:</h6>
-                        <input type="number" name="streams per mac" id="editStreamsPerMac"
-                            class="form-control flex-fill" title="Streams Per MAC" min="0" required>
-                        <span class="text-muted">How many streams does each MAC allow. 0 = unlimited.</span>
-                        <br>
-                        <br>
-                        <div class="modal-footer">
-                            <button class="btn btn-secondary" title="Cancel" data-bs-dismiss="modal">Cancel</button>
-                            <button class="btn btn-success btn-block" title="Save">Save</button>
-                        </div>
-                    </form>
-
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Delete Modal -->
-    <div class="modal fade text-dark" id="modalRemove" tabindex="-1">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Delete Portal</h5>
-                </div>
-                <div class="modal-body">
-                    <form action="/portal/remove" method="post">
-                        <h6 class="p-3" id="deleteName"></h6>
-                        <br>
-                        <div class="modal-footer">
-                            <form action="/portal/remove" method="post">
-                                <button class="btn btn-secondary" title="Cancel" data-bs-dismiss="modal">Cancel</button>
-                                <button class="btn btn-danger btn-block" name="id" id="deleteId" title="Delete"
-                                    value="">Delete</button>
-                            </form>
-                        </div>
-                    </form>
-                </div>
-            </div>
-        </div>
     </div>
 
 </div>
 
+
+<!-- Add Modal -->
+<div class="modal fade text-dark" id="modalAdd" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Add Portal</h5>
+            </div>
+            <div class="modal-body">
+
+                <form action="/portal/add" method="post">
+
+                    <h6>Name:</h6>
+                    <input type="text" name="name" class="form-control flex-fill" title="Name" required>
+                    <span class="text-muted">Give this portal a name.</span>
+
+                    <br><br>
+
+                    <h6>URL:</h6>
+                    <input type="text" name="url" class="form-control flex-fill" title="URL" required>
+                    <span class="text-muted">Its best to enter the full address ending in .php if you know
+                        it.<br>If
+                        not STB-Proxy will attempt to figure it out for you.</span>
+
+                    <br><br>
+
+                    <h6>Proxy:</h6>
+                    <input type="text" name="proxy" class="form-control flex-fill" title="Proxy">
+                    <span class="text-muted">STB-Proxy supports HTML proxies only.</span>
+
+                    <br><br>
+
+                    <h6>MACs:</h6>
+                    <input type="text" name="macs" class="form-control flex-fill" title="MACs" required>
+                    <span class="text-muted">Enter a comma seperated list of MAC adresses.</span>
+
+                    <br><br>
+
+                    <h6>Streams Per MAC:</h6>
+                    <input type="number" name="streams per mac" class="form-control flex-fill" title="Streams Per Mac"
+                        min="0" value="1" required>
+                    <span class="text-muted">How many streams does each MAC allow. 0 = unlimited.</span>
+
+                    <br><br>
+
+                    <div class="modal-footer">
+                        <button class="btn btn-secondary" title="Cancel" data-bs-dismiss="modal">Cancel</button>
+                        <button class="btn btn-success btn-block" title="Add">Add</button>
+                    </div>
+
+                </form>
+
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Modal -->
+<div class="modal fade text-dark" id="modalEdit" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Edit Portal</h5>
+            </div>
+            <div class="modal-body">
+
+                <form action="/portal/update" method="post">
+
+                    <input name="id" id="editId" class="form-control flex-fill" hidden>
+
+                    <h6>Name:</h6>
+                    <input type="text" name="name" id="editName" class="form-control flex-fill" title="Name" required>
+                    <span class="text-muted">Give this portal a name.</span>
+
+                    <br><br>
+
+                    <h6>URL:</h6>
+                    <input type="text" name="url" id="editUrl" class="form-control flex-fill" title="URL" required>
+                    <span class="text-muted">Its best to enter the full address ending in .php if you know
+                        it.<br>If
+                        not STB-Proxy will attempt to figure it out for you.</span>
+
+                    <br><br>
+
+                    <h6>Proxy:</h6>
+                    <input type="text" name="proxy" id="editProxy" class="form-control flex-fill" title="Proxy">
+                    <span class="text-muted">STB-Proxy supports HTML proxies only.</span>
+
+                    <br><br>
+
+                    <h6>MACs:</h6>
+                    <input type="text" name="macs" id="editMacs" class="form-control flex-fill" title="MACs" required>
+                    <span class="text-muted">Enter a comma seperated list of MAC adresses.</span>
+
+                    <br><br>
+
+                    <h6>Streams Per MAC:</h6>
+                    <input type="number" name="streams per mac" id="editStreamsPerMac" class="form-control flex-fill"
+                        title="Streams Per MAC" min="0" required>
+                    <span class="text-muted">How many streams does each MAC allow. 0 = unlimited.</span>
+
+                    <br><br>
+
+                    <div class="modal-footer">
+                        <button class="btn btn-danger me-auto" title="Delete" form="delete"
+                            id="deleteName">Delete</button>
+                        <button class="btn btn-secondary" title="Cancel" data-bs-dismiss="modal">Cancel</button>
+                        <button class="btn btn-success" title="Save">Save</button>
+                    </div>
+
+                </form>
+
+                <form id="delete" action="/portal/remove" method="post" onsubmit="return confirm('Confirm Delete');" hidden>
+                    <input type="text" name="deleteId" id="deleteId" value="">
+                </form>
+
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
 
-    var now = Date.now()
-    var expiries = document.getElementsByName("expiryString")
+    var now = Date.now();
+    var expiries = document.getElementsByName("expiryString");
     for (i in expiries) {
         var expires = Date.parse(expiries[i].innerText);
         var diff = expires - now;
         var daysAway = diff / (1000 * 3600 * 24);
         if (now > expires) {
-            expiries[i].classList.add("text-danger");
+            expiries[i].parentElement.parentElement.classList.add("table-danger");
         } else if (daysAway < 30) {
-            expiries[i].classList.add("text-warning");
+            expiries[i].parentElement.parentElement.classList.add("table-warning");
         }
 
     }
 
-    var modalRemove = document.getElementById('modalRemove')
-    modalRemove.addEventListener('show.bs.modal', function (event) {
-        var button = event.relatedTarget
-        var portal = button.getAttribute('data-portalId')
-        var name = button.getAttribute('data-portalName')
-        document.getElementById('deleteId').value = portal
-        document.getElementById('deleteName').innerText = "Are you sure you want to delete " + name + "?"
-    })
-
-    var modalEdit = document.getElementById('modalEdit')
-    modalEdit.addEventListener('show.bs.modal', function (event) {
-        var button = event.relatedTarget
-        var id = button.getAttribute('data-id')
-        var name = button.getAttribute('data-name')
-        var url = button.getAttribute('data-url')
-        var proxy = button.getAttribute('data-proxy')
-        var macs = button.getAttribute('data-macs')
-        var streamsPerMac = button.getAttribute('data-streamsPerMac')
-        document.getElementById('editId').value = id
-        document.getElementById('editName').value = name
-        document.getElementById('editUrl').value = url
-        document.getElementById('editProxy').value = proxy
-        document.getElementById('editMacs').value = macs
-        document.getElementById('editStreamsPerMac').value = streamsPerMac
+    var editModal = document.getElementById('modalEdit');
+    editModal.addEventListener('show.bs.modal', function (event) {
+        var button = event.relatedTarget;
+        var id = button.getAttribute('data-id');
+        var name = button.getAttribute('data-name');
+        var url = button.getAttribute('data-url');
+        var proxy = button.getAttribute('data-proxy');
+        var macs = button.getAttribute('data-macs');
+        var streamsPerMac = button.getAttribute('data-streamsPerMac');
+        document.getElementById('editId').value = id;
+        document.getElementById('editName').value = name;
+        document.getElementById('editUrl').value = url;
+        document.getElementById('editProxy').value = proxy;
+        document.getElementById('editMacs').value = macs;
+        document.getElementById('editStreamsPerMac').value = streamsPerMac;
+        document.getElementById('deleteId').value = id;
+        document.getElementById('deleteName').value = name;
     })
 
 </script>

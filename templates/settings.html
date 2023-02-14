@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block content %}
 
-<div class="container-fluid text-light px-lg-5 pb-lg-5">
+<div class="container-fluid text-light m-lg-5">
 
     <div class="mt-sm-3">
         <button form="save" class="btn btn-success btn-block" title="Save"><i class="fa fa-save"></i> Save</button>
@@ -28,6 +28,7 @@
     <h4>Streaming</h4>
     <hr>
     <div class="p-sm-3">
+
         <h6>Streaming Method:</h6>
         <div class="col-md-2">
             <select class="form-select" title="Update Time" form="save" id="stream method" name="stream method"
@@ -37,8 +38,9 @@
             </select>
         </div>
         <span class="text-muted">FFMpeg is required to keep track of accounts and ensure only x users per MAC.</span>
-        <br>
-        <br>
+        
+        <br><br>
+        
         <h6>FFMpeg Command:</h6>
         <div class="col-md-12">
             <div class="input-group flex-nowrap">
@@ -50,8 +52,9 @@
             </div>
         </div>
         <span class="text-muted">Edit with caution! Check FFmpeg documentation for help.<br>'&lt;proxy&gt;', '&lt;url&gt;', and '&lt;timeout&gt;' are the available variables.</span>
-        <br>
-        <br>
+        
+        <br><br>
+        
         <h6>FFMpeg Timeout:</h6>
         <div class="col-md-2">
             <div class="input-group flex-nowrap">
@@ -62,8 +65,9 @@
             </div>
         </div>
         <span class="text-muted">Seconds to wait for a stream before giving up.</span>
-        <br>
-        <br>
+        
+        <br><br>
+        
         <h6>Test Streams:</h6>
         <div class="col-md-2">
             <div class="form-check form-switch">
@@ -72,8 +76,9 @@
             </div>
         </div>
         <span class="text-muted">This is required for the fallback system to work.</span>
-        <br>
-        <br>
+        
+        <br><br>
+        
         <h6>Try All MAC's:</h6>
         <div class="col-md-2">
             <div class="form-check form-switch">
@@ -82,6 +87,7 @@
             </div>
         </div>
         <span class="text-muted">Try all MAC's before looking for a fallback.</span>
+
     </div>
 
     <br>
@@ -89,30 +95,39 @@
     <h4>Playlist</h4>
     <hr>
     <div class="p-sm-3">
+
         <h6>Use channel genres:</h6>
         <div class="form-check form-switch">
             <input type="checkbox" class="checkbox form-check-input" onchange="enable(this)" {{ "checked" if
                 settings['use channel genres']=='true' }} data-input="use channel genres">
         </div>
+        
         <br>
+        
         <h6>Use channel numbers:</h6>
         <div class="form-check form-switch">
             <input type="checkbox" class="checkbox form-check-input" onchange="enable(this)" {{ "checked" if
                 settings['use channel numbers']=='true' }} data-input="use channel numbers">
         </div>
+        
         <br>
+        
         <h6>Sort by genre:</h6>
         <div class="form-check form-switch">
             <input type="checkbox" class="checkbox form-check-input" onchange="enable(this)" {{ "checked" if
                 settings['sort playlist by channel genre']=='true' }} data-input="sort playlist by channel genre">
         </div>
+        
         <br>
+        
         <h6>Sort by number:</h6>
         <div class="form-check form-switch">
             <input type="checkbox" class="checkbox form-check-input" onchange="enable(this)" {{ "checked" if
                 settings['sort playlist by channel number']=='true' }} data-input="sort playlist by channel number">
         </div>
+        
         <br>
+        
         <h6>Sort by name:</h6>
         <div class="form-check form-switch">
             <input type="checkbox" class="checkbox form-check-input" onchange="enable(this)" {{ "checked" if
@@ -120,6 +135,7 @@
         </div>
         <span class="text-muted">Sorting options stack and are applied: Genre > Number > Name.<br>Without any sorting
             the channels are listed as the server lists them.</span>
+
     </div>
 
     <br>
@@ -127,24 +143,30 @@
     <h4>Security</h4>
     <hr>
     <div class="p-sm-3">
+
         <h6>Enable:</h6>
         <div class="form-check form-switch">
             <input type="checkbox" class="checkbox form-check-input" onchange="enable(this)"
                 data-input="enable security" {{ "checked" if settings['enable security']=='true' }}>
         </div>
+        
         <br>
+        
         <h6>Username:</h6>
         <div class="col-md-4">
             <input form="save" type="text" name="username" id="username" class="form-control"
                 value="{{ settings['username'] }}" title="Username" required>
         </div>
+        
         <br>
+        
         <h6>Password:</h6>
         <div class="col-md-4">
             <input form="save" type="text" name="password" id="password" class="form-control"
                 value="{{ settings['password'] }}" title="Password" required>
         </div>
         <span class="text-muted">Recommended if STB-Proxy is exposed to the internet or on a public network.</span>
+
     </div>
 
     <br>
@@ -152,12 +174,15 @@
     <h4>HDHomeRun</h4>
     <hr>
     <div class="p-sm-3">
+
         <h6>Enable:</h6>
         <div class="form-check form-switch">
             <input type="checkbox" class="checkbox form-check-input" onchange="enable(this)" data-input="enable hdhr"
                 {{ "checked" if settings['enable hdhr']=='true' }}>
         </div>
+        
         <br>
+        
         <h6>Name:</h6>
         <div class="col-md-4">
             <div class="input-group flex-nowrap">
@@ -181,6 +206,7 @@
             </div>
         </div>
         <span class="text-muted">Max concurrent streams in Plex DVR etc.</span>
+        
     </div>
 
 </div>

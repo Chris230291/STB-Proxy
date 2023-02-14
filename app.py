@@ -149,8 +149,7 @@ def home():
 @app.route("/portals", methods=["GET"])
 @authorise
 def portals():
-    portals = getPortals()
-    return render_template("portals.html", portals=portals)
+    return render_template("portals.html", portals=getPortals())
 
 
 @app.route("/portal/add", methods=["POST"])
@@ -158,7 +157,7 @@ def portals():
 def portalsAdd():
     name = request.form["name"]
     url = request.form["url"]
-    macs = request.form["macs"].split(",")
+    macs = list(set(request.form["macs"].split(",")))
     streamsPerMac = request.form["streams per mac"]
     proxy = request.form["proxy"]
     id = uuid.uuid4().hex
@@ -210,7 +209,7 @@ def portalsAdd():
 def portalUpdate():
     name = request.form["name"]
     url = request.form["url"]
-    macs = request.form["macs"].split(",")
+    macs = list(set(request.form["macs"].split(",")))
     streamsPerMac = request.form["streams per mac"]
     proxy = request.form["proxy"]
     id = request.form["id"]
@@ -258,7 +257,7 @@ def portalUpdate():
 @app.route("/portal/remove", methods=["POST"])
 @authorise
 def portalRemove():
-    id = request.form["id"]
+    id = request.form["deleteId"]
     portals = getPortals()
     name = portals[id]["name"]
     del portals[id]
@@ -540,7 +539,7 @@ def playlist():
                         genre = customGenres.get(channelId)
                         if genre == None:
                             genreId = str(channel.get("tv_genre_id"))
-                            genre = genres.get(genreId)
+                            genre = str(genres.get(genreId))
                         channelNumber = customChannelNumbers.get(channelId)
                         if channelNumber == None:
                             channelNumber = str(channel.get("number"))
