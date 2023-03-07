@@ -57,7 +57,7 @@
 
     {% with messages = get_flashed_messages(with_categories=true) %}
     {% for category, message in messages %}
-    <div class="alert alert-{{ category }} alert-dismissible fade show mx-lg-5" role="alert">
+    <div class="alert alert-{{ category }} alert-dismissible auto-dismiss fade show mx-lg-5" role="alert">
         {{ message }}
         <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     </div>
@@ -73,7 +73,7 @@
 <script>
     // remove flash after delay
     window.setTimeout(function () {
-        $(".alert").fadeTo(500, 0).slideUp(500, function () {
+        $(".auto-dismiss").fadeTo(500, 0).slideUp(500, function () {
             $(this).remove();
         });
     }, 4000);
