@@ -22,9 +22,7 @@
                 <div class="card-header btn text-start stretched-link" data-id="{{ portal }}"
                     data-name="{{ portals[portal].name }}" data-url="{{ portals[portal].url }}"
                     data-proxy="{{ portals[portal].proxy }}" data-macs="{{ portals[portal].macs|join(',') }}"
-                    data-streamsPerMac="{{ portals[portal]['streams per mac'] }}"
-                    data-enabled="{{ portals[portal]['enabled'] }}"
-                    data-enableAllChannels="{{ portals[portal]['enable all channels'] }}" data-bs-toggle="modal"
+                    data-streamsPerMac="{{ portals[portal]['streams per mac'] }}" data-bs-toggle="modal"
                     data-bs-target="#modalEdit">
                     <i class="me-2 fa fa-server"></i>{{ portals[portal].name }}
                 </div>
@@ -63,16 +61,6 @@
 
                 <form action="/portal/add" method="post">
 
-                    <h6>Enabled:</h6>
-                    <div class="form-check form-switch">
-                        <input type="checkbox" class="checkbox form-check-input" checked onclick="enable(this)"
-                            data-input="enabled">
-                    </div>
-                    <input type="text" name="enabled" id="enabled" value="true" hidden>
-                    <span class="text-muted">Disable to skip this portal.</span>
-
-                    <br><br>
-
                     <h6>Name:</h6>
                     <input type="text" name="name" class="form-control flex-fill" title="Name" required>
                     <span class="text-muted">Give this portal a name.</span>
@@ -106,19 +94,9 @@
 
                     <br><br>
 
-                    <h6>Enable All Channels:</h6>
-                    <div class="form-check form-switch">
-                        <input type="checkbox" class="checkbox form-check-input" onclick="enable(this)"
-                            data-input="enable all channels">
-                    </div>
-                    <input type="text" name="enable all channels" id="enable all channels" value="false" hidden>
-                    <span class="text-muted">Enables all available channels</span>
-
-                    <br><br>
-
                     <div class="modal-footer">
                         <button class="btn btn-secondary" title="Cancel" data-bs-dismiss="modal">Cancel</button>
-                        <button class="btn btn-success btn-block" title="Add" onclick="spinner(this)">Add</button>
+                        <button class="btn btn-success btn-block" title="Add">Add</button>
                     </div>
 
                 </form>
@@ -140,16 +118,6 @@
                 <form action="/portal/update" method="post">
 
                     <input name="id" id="editId" class="form-control flex-fill" hidden>
-
-                    <h6>Enabled:</h6>
-                    <div class="form-check form-switch">
-                        <input type="checkbox" class="checkbox form-check-input" id="editEnabledCheck" checked
-                            onclick="enable(this)" data-input="editEnabled">
-                    </div>
-                    <input type="text" name="enabled" id="editEnabled" value="true" hidden>
-                    <span class="text-muted">Disable to skip this portal.</span>
-
-                    <br><br>
 
                     <h6>Name:</h6>
                     <input type="text" name="name" id="editName" class="form-control flex-fill" title="Name" required>
@@ -184,27 +152,16 @@
 
                     <br><br>
 
-                    <h6>Enable All Channels:</h6>
-                    <div class="form-check form-switch">
-                        <input type="checkbox" class="checkbox form-check-input" id="editEnableAllChannelsCheck"
-                            onclick="enable(this)" data-input="editEnableAllChannels">
-                    </div>
-                    <input type="text" name="enable all channels" id="editEnableAllChannels" value="false" hidden>
-                    <span class="text-muted">Enables all available channels</span>
-
-                    <br><br>
-
                     <div class="modal-footer">
                         <button class="btn btn-danger me-auto" title="Delete" form="delete"
                             id="deleteName">Delete</button>
                         <button class="btn btn-secondary" title="Cancel" data-bs-dismiss="modal">Cancel</button>
-                        <button class="btn btn-success" title="Save" onclick="spinner(this)">Save</button>
+                        <button class="btn btn-success" title="Save">Save</button>
                     </div>
 
                 </form>
 
-                <form id="delete" action="/portal/remove" method="post" onsubmit="return confirm('Confirm Delete');"
-                    hidden>
+                <form id="delete" action="/portal/remove" method="post" onsubmit="return confirm('Confirm Delete');" hidden>
                     <input type="text" name="deleteId" id="deleteId" value="">
                 </form>
 
@@ -238,8 +195,6 @@
         var proxy = button.getAttribute('data-proxy');
         var macs = button.getAttribute('data-macs');
         var streamsPerMac = button.getAttribute('data-streamsPerMac');
-        var enabled = button.getAttribute('data-enabled');
-        var enableAllChannels = button.getAttribute('data-enableAllChannels');
         document.getElementById('editId').value = id;
         document.getElementById('editName').value = name;
         document.getElementById('editUrl').value = url;
@@ -247,31 +202,8 @@
         document.getElementById('editMacs').value = macs;
         document.getElementById('editStreamsPerMac').value = streamsPerMac;
         document.getElementById('deleteId').value = id;
-        document.getElementById('editEnabled').value = enabled;
-        if (enabled == "true") {
-            document.getElementById('editEnabledCheck').checked = true;
-        } else {
-            document.getElementById('editEnabledCheck').checked = false;
-        }
-        document.getElementById('editEnableAllChannels').value = enableAllChannels;
-        if (enableAllChannels == "true") {
-            document.getElementById('editEnableAllChannelsCheck').checked = true;
-        } else {
-            document.getElementById('editEnableAllChannelsCheck').checked = false;
-        }
-
-
+        document.getElementById('deleteName').value = name;
     })
-
-    function enable(ele) {
-        var c = ele.checked;
-        var i = ele.getAttribute('data-input');
-        document.getElementById(i).value = c;
-    }
-
-    function spinner(ele) {
-        ele.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> ' + ele.innerHTML
-    }
 
 </script>
 

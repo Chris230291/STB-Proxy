@@ -9,7 +9,6 @@
     <br>
 
     <form id="save" action="/settings/save" method="post"></form>
-    <input form="save" type="text" name="hdhr id" id="hdhr id" value="{{ settings['hdhr id'] }}" hidden>
     <input form="save" type="text" name="test streams" id="test streams" value="{{ settings['test streams'] }}" hidden>
     <input form="save" type="text" name="try all macs" id="try all macs" value="{{ settings['try all macs'] }}" hidden>
     <input form="save" type="text" name="use channel numbers" id="use channel numbers"
@@ -49,7 +48,7 @@
                     value="{{ settings['ffmpeg command'] }}" required>
                 <button class="btn btn-danger btn-block" title="Reset"><i class="fa fa-undo"
                         onclick="resetDefault(this)" data-input="ffmpeg command"
-                        data-default="{{ defaultSettings['ffmpeg command'] }}"></i></button>
+                        data-default="{{ d_ffmpegcmd }}"></i></button>
             </div>
         </div>
         <span class="text-muted">Edit with caution! Check FFmpeg documentation for help.<br>'&lt;proxy&gt;', '&lt;url&gt;', and '&lt;timeout&gt;' are the available variables.</span>
@@ -62,7 +61,7 @@
                 <input form="save" type="number" name="ffmpeg timeout" id="ffmpeg timeout" class="form-control"
                     value="{{ settings['ffmpeg timeout'] }}" required>
                 <button class="btn btn-danger btn-block" title="Reset"><i class="fa fa-undo"
-                        onclick="resetDefault(this)" data-input="ffmpeg timeout" data-default="{{ defaultSettings['ffmpeg timeout'] }}"></i></button>
+                        onclick="resetDefault(this)" data-input="ffmpeg timeout" data-default="5"></i></button>
             </div>
         </div>
         <span class="text-muted">Seconds to wait for a stream before giving up.</span>
@@ -190,7 +189,7 @@
                 <input form="save" type="text" name="hdhr name" id="hdhr name" class="form-control"
                     value="{{ settings['hdhr name'] }}" required>
                 <button class="btn btn-danger btn-block" title="Reset"><i class="fa fa-undo"
-                        onclick="resetDefault(this)" data-input="hdhr name" data-default="{{ defaultSettings['hdhr name'] }}"></i></button>
+                        onclick="resetDefault(this)" data-input="hdhr name" data-default="STB-Proxy"></i></button>
             </div>
         </div>
         <span class="text-muted">Display name of the server in Plex DVR etc.</span>
@@ -203,7 +202,7 @@
                 <input form="save" type="number" name="hdhr tuners" id="hdhr tuners" class="form-control"
                     value="{{ settings['hdhr tuners'] }}" required>
                 <button class="btn btn-danger btn-block" title="Reset"><i class="fa fa-undo"
-                        onclick="resetDefault(this)" data-input="hdhr tuners" data-default="{{ defaultSettings['hdhr tuners'] }}"></i></button>
+                        onclick="resetDefault(this)" data-input="hdhr tuners" data-default="1"></i></button>
             </div>
         </div>
         <span class="text-muted">Max concurrent streams in Plex DVR etc.</span>
