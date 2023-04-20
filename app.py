@@ -1177,5 +1177,5 @@ def lineup():
 
 if __name__ == "__main__":
     config = getConfig()
-    # waitress.serve(app, port=8001, _quiet=True)
-    app.run(host="0.0.0.0", port=8001, debug=debug)
+    waitress.serve(app, port=8001, _quiet=True)
+    # app.run(host="0.0.0.0", port=8001, debug=debug)
