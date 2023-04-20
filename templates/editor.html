@@ -239,6 +239,9 @@
                         if (data == true) {
                             r = r + ' checked';
                         }
+                        if (row.enableAllChannels == true) {
+                            r = r + ' disabled';
+                        }
                         r = r + '></div>'
                         return r
                     }
