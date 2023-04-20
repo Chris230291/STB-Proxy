@@ -63,7 +63,7 @@
                 for (var portal in json) {
                     for (const stream of json[portal]) {
                         var portal = stream["portal name"]
-                        var mac = stream["mac"].toUpperCase()
+                        var mac = stream["mac"]
                         var client = stream["client"]
                         var channel = stream["channel name"]
                         var start = stream["start time"] * 1000
