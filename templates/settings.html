@@ -9,21 +9,6 @@
     <br>
 
     <form id="save" action="/settings/save" method="post"></form>
-    <input form="save" type="text" name="test streams" id="test streams" value="{{ settings['test streams'] }}" hidden>
-    <input form="save" type="text" name="try all macs" id="try all macs" value="{{ settings['try all macs'] }}" hidden>
-    <input form="save" type="text" name="use channel numbers" id="use channel numbers"
-        value="{{ settings['use channel numbers'] }}" hidden>
-    <input form="save" type="text" name="use channel genres" id="use channel genres"
-        value="{{ settings['use channel genres'] }}" hidden>
-    <input form="save" type="text" name="sort playlist by channel genre" id="sort playlist by channel genre"
-        value="{{ settings['sort playlist by channel genre'] }}" hidden>
-    <input form="save" type="text" name="sort playlist by channel number" id="sort playlist by channel number"
-        value="{{ settings['sort playlist by channel number'] }}" hidden>
-    <input form="save" type="text" name="sort playlist by channel name" id="sort playlist by channel name"
-        value="{{ settings['sort playlist by channel name'] }}" hidden>
-    <input form="save" type="text" name="enable hdhr" id="enable hdhr" value="{{ settings['enable hdhr'] }}" hidden>
-    <input form="save" type="text" name="enable security" id="enable security" value="{{ settings['enable security'] }}"
-        hidden>
 
     <h4>Streaming</h4>
     <hr>
@@ -31,16 +16,16 @@
 
         <h6>Streaming Method:</h6>
         <div class="col-md-2">
-            <select class="form-select" title="Update Time" form="save" id="stream method" name="stream method"
+            <select class="form-select" title="Streaming Method" form="save" id="stream method" name="stream method"
                 required>
                 <option {{ "selected" if settings['stream method']=="ffmpeg" }} value="ffmpeg">FFMpeg</option>
                 <option {{ "selected" if settings['stream method']=="redirect" }} value="redirect">Redirect</option>
             </select>
         </div>
         <span class="text-muted">FFMpeg is required to keep track of accounts and ensure only x users per MAC.</span>
-        
+
         <br><br>
-        
+
         <h6>FFMpeg Command:</h6>
         <div class="col-md-12">
             <div class="input-group flex-nowrap">
@@ -48,42 +33,41 @@
                     value="{{ settings['ffmpeg command'] }}" required>
                 <button class="btn btn-danger btn-block" title="Reset"><i class="fa fa-undo"
                         onclick="resetDefault(this)" data-input="ffmpeg command"
-                        data-default="{{ d_ffmpegcmd }}"></i></button>
+                        data-default="{{ defaultSettings['ffmpeg command'] }}"></i></button>
             </div>
         </div>
-        <span class="text-muted">Edit with caution! Check FFmpeg documentation for help.<br>'&lt;proxy&gt;', '&lt;url&gt;', and '&lt;timeout&gt;' are the available variables.</span>
-        
+        <span class="text-muted">Edit with caution! Check FFmpeg documentation for help.<br>'&lt;proxy&gt;',
+            '&lt;url&gt;', and '&lt;timeout&gt;' are the available variables.</span>
+
         <br><br>
-        
+
         <h6>FFMpeg Timeout:</h6>
         <div class="col-md-2">
             <div class="input-group flex-nowrap">
                 <input form="save" type="number" name="ffmpeg timeout" id="ffmpeg timeout" class="form-control"
                     value="{{ settings['ffmpeg timeout'] }}" required>
                 <button class="btn btn-danger btn-block" title="Reset"><i class="fa fa-undo"
-                        onclick="resetDefault(this)" data-input="ffmpeg timeout" data-default="5"></i></button>
+                        onclick="resetDefault(this)" data-input="ffmpeg timeout" data-default="{{ defaultSettings['ffmpeg timeout'] }}"></i></button>
             </div>
         </div>
         <span class="text-muted">Seconds to wait for a stream before giving up.</span>
-        
+
         <br><br>
-        
+
         <h6>Test Streams:</h6>
         <div class="col-md-2">
             <div class="form-check form-switch">
-                <input type="checkbox" class="checkbox form-check-input" onchange="enable(this)" {{ "checked" if
-                    settings['test streams']=='true' }} data-input="test streams">
+                <input form="save" type="checkbox" class="checkbox form-check-input" name="test streams" value="true" {{ "checked" if settings['test streams']=='true' }}>
             </div>
         </div>
         <span class="text-muted">This is required for the fallback system to work.</span>
-        
+
         <br><br>
-        
+
         <h6>Try All MAC's:</h6>
         <div class="col-md-2">
             <div class="form-check form-switch">
-                <input type="checkbox" class="checkbox form-check-input" onchange="enable(this)" {{ "checked" if
-                    settings['try all macs']=='true' }} data-input="try all macs">
+                <input form="save" type="checkbox" class="checkbox form-check-input" name="try all macs" value="true" {{ "checked" if settings['try all macs']=='true' }}>
             </div>
         </div>
         <span class="text-muted">Try all MAC's before looking for a fallback.</span>
@@ -98,40 +82,35 @@
 
         <h6>Use channel genres:</h6>
         <div class="form-check form-switch">
-            <input type="checkbox" class="checkbox form-check-input" onchange="enable(this)" {{ "checked" if
-                settings['use channel genres']=='true' }} data-input="use channel genres">
+            <input form="save" type="checkbox" class="checkbox form-check-input" name="use channel genres" value="true" {{ "checked" if settings['use channel genres']=='true' }}>
         </div>
-        
+
         <br>
-        
+
         <h6>Use channel numbers:</h6>
         <div class="form-check form-switch">
-            <input type="checkbox" class="checkbox form-check-input" onchange="enable(this)" {{ "checked" if
-                settings['use channel numbers']=='true' }} data-input="use channel numbers">
+            <input form="save" type="checkbox" class="checkbox form-check-input" name="use channel numbers" value="true" {{ "checked" if settings['use channel numbers']=='true' }}>
         </div>
-        
+
         <br>
-        
+
         <h6>Sort by genre:</h6>
         <div class="form-check form-switch">
-            <input type="checkbox" class="checkbox form-check-input" onchange="enable(this)" {{ "checked" if
-                settings['sort playlist by channel genre']=='true' }} data-input="sort playlist by channel genre">
+            <input form="save" type="checkbox" class="checkbox form-check-input" name="sort playlist by channel genre" value="true" {{ "checked" if settings['sort playlist by channel genre']=='true' }}>
         </div>
-        
+
         <br>
-        
+
         <h6>Sort by number:</h6>
         <div class="form-check form-switch">
-            <input type="checkbox" class="checkbox form-check-input" onchange="enable(this)" {{ "checked" if
-                settings['sort playlist by channel number']=='true' }} data-input="sort playlist by channel number">
+            <input form="save" type="checkbox" class="checkbox form-check-input" name="sort playlist by channel number" value="true" {{ "checked" if settings['sort playlist by channel number']=='true' }}>
         </div>
-        
+
         <br>
-        
+
         <h6>Sort by name:</h6>
         <div class="form-check form-switch">
-            <input type="checkbox" class="checkbox form-check-input" onchange="enable(this)" {{ "checked" if
-                settings['sort playlist by channel name']=='true' }} data-input="sort playlist by channel name">
+            <input form="save" type="checkbox" class="checkbox form-check-input" name="sort playlist by channel name" value="true" {{ "checked" if settings['sort playlist by channel name']=='true' }}>
         </div>
         <span class="text-muted">Sorting options stack and are applied: Genre > Number > Name.<br>Without any sorting
             the channels are listed as the server lists them.</span>
@@ -146,23 +125,22 @@
 
         <h6>Enable:</h6>
         <div class="form-check form-switch">
-            <input type="checkbox" class="checkbox form-check-input" onchange="enable(this)"
-                data-input="enable security" {{ "checked" if settings['enable security']=='true' }}>
+            <input form="save" type="checkbox" class="checkbox form-check-input" name="enable security" value="true" {{ "checked" if settings['enable security']=='true' }}>
         </div>
-        
+
         <br>
-        
+
         <h6>Username:</h6>
         <div class="col-md-4">
             <input form="save" type="text" name="username" id="username" class="form-control"
                 value="{{ settings['username'] }}" title="Username" required>
         </div>
-        
+
         <br>
-        
+
         <h6>Password:</h6>
         <div class="col-md-4">
-            <input form="save" type="text" name="password" id="password" class="form-control"
+            <input form="save" type="password" name="password" id="password" class="form-control"
                 value="{{ settings['password'] }}" title="Password" required>
         </div>
         <span class="text-muted">Recommended if STB-Proxy is exposed to the internet or on a public network.</span>
@@ -177,19 +155,18 @@
 
         <h6>Enable:</h6>
         <div class="form-check form-switch">
-            <input type="checkbox" class="checkbox form-check-input" onchange="enable(this)" data-input="enable hdhr"
-                {{ "checked" if settings['enable hdhr']=='true' }}>
+            <input form="save" type="checkbox" class="checkbox form-check-input" name="enable hdhr" value="true" {{ "checked" if settings['enable hdhr']=='true' }}>
         </div>
-        
+
         <br>
-        
+
         <h6>Name:</h6>
         <div class="col-md-4">
             <div class="input-group flex-nowrap">
                 <input form="save" type="text" name="hdhr name" id="hdhr name" class="form-control"
                     value="{{ settings['hdhr name'] }}" required>
                 <button class="btn btn-danger btn-block" title="Reset"><i class="fa fa-undo"
-                        onclick="resetDefault(this)" data-input="hdhr name" data-default="STB-Proxy"></i></button>
+                        onclick="resetDefault(this)" data-input="hdhr name" data-default="{{ defaultSettings['hdhr name'] }}"></i></button>
             </div>
         </div>
         <span class="text-muted">Display name of the server in Plex DVR etc.</span>
@@ -202,7 +179,7 @@
                 <input form="save" type="number" name="hdhr tuners" id="hdhr tuners" class="form-control"
                     value="{{ settings['hdhr tuners'] }}" required>
                 <button class="btn btn-danger btn-block" title="Reset"><i class="fa fa-undo"
-                        onclick="resetDefault(this)" data-input="hdhr tuners" data-default="1"></i></button>
+                        onclick="resetDefault(this)" data-input="hdhr tuners" data-default="{{ defaultSettings['hdhr tuners'] }}"></i></button>
             </div>
         </div>
         <span class="text-muted">Max concurrent streams in Plex DVR etc.</span>
@@ -216,12 +193,6 @@
         var d = ele.getAttribute('data-default');
         var i = ele.getAttribute('data-input');
         document.getElementById(i).value = d;
-    }
-
-    function enable(ele) {
-        var c = ele.checked;
-        var i = ele.getAttribute('data-input');
-        document.getElementById(i).value = c;
     }
 </script>
 

@@ -18,7 +18,6 @@ from flask import (
 from datetime import datetime, timezone
 from functools import wraps
 import secrets
-import random
 import waitress
 
 app = Flask(__name__)
@@ -57,8 +56,43 @@ config = {}
 
 d_ffmpegcmd = "ffmpeg -re -http_proxy <proxy> -timeout <timeout> -i <url> -map 0 -codec copy -f mpegts pipe:"
 
+defaultSettings = {
+    "stream method": "ffmpeg",
+    "ffmpeg command": "ffmpeg -re -http_proxy <proxy> -timeout <timeout> -i <url> -map 0 -codec copy -f mpegts pipe:",
+    "ffmpeg timeout": "5",
+    "test streams": "true",
+    "try all macs": "false",
+    "use channel genres": "true",
+    "use channel numbers": "true",
+    "sort playlist by channel genre": "false",
+    "sort playlist by channel number": "false",
+    "sort playlist by channel name": "false",
+    "enable security": "false",
+    "username": "admin",
+    "password": "12345",
+    "enable hdhr": "false",
+    "hdhr name": "STB-Proxy",
+    "hdhr id": str(uuid.uuid4().hex),
+    "hdhr tuners": "1",
+}
 
-def getConfig():
+defaultPortal = {
+    "enabled": "true",
+    "name": "",
+    "url": "",
+    "macs": {},
+    "streams per mac": "1",
+    "proxy": "",
+    "enabled groups": [],
+    "custom group names": {},
+    "enabled channels": [],
+    "custom channel names": {},
+    "custom epg ids": {},
+    "fallback channels": {},
+}
+
+
+def loadConfig():
     try:
         with open(configFile) as f:
             data = json.load(f)
@@ -69,25 +103,29 @@ def getConfig():
     data.setdefault("portals", {})
     data.setdefault("settings", {})
 
-    data["settings"].setdefault("sort playlist by channel genre", "false")
-    data["settings"].setdefault("sort playlist by channel name", "false")
-    data["settings"].setdefault("sort playlist by channel number", "false")
-    data["settings"].setdefault("use channel genres", "true")
-    data["settings"].setdefault("use channel numbers", "true")
-    data["settings"].setdefault("stream method", "ffmpeg")
-    data["settings"].setdefault("ffmpeg command", "-vcodec copy -acodec copy -f mpegts")
-    data["settings"].setdefault("ffmpeg timeout", "5")
-    data["settings"].setdefault("test streams", "true")
-    data["settings"].setdefault("try all macs", "false")
-    data["settings"].setdefault("enable hdhr", "false")
-    data["settings"].setdefault("hdhr name", "STB-Proxy")
-    data["settings"].setdefault("hdhr id", uuid.uuid4().hex)
-    data["settings"].setdefault("hdhr tuners", "1")
-    data["settings"].setdefault("enable security", "false")
-    data["settings"].setdefault("username", "admin")
-    data["settings"].setdefault("password", "12345")
-    if not data["settings"]["ffmpeg command"].startswith("ffmpeg"):
-        data["settings"]["ffmpeg command"] = d_ffmpegcmd
+    settings = data["settings"]
+    settingsOut = {}
+
+    for setting, default in defaultSettings.items():
+        value = settings.get(setting)
+        if not value or type(default) != type(value):
+            value = default
+        settingsOut[setting] = value
+
+    data["settings"] = settingsOut
+
+    portals = data["portals"]
+    portalsOut = {}
+
+    for portal in portals:
+        portalsOut[portal] = {}
+        for setting, default in defaultPortal.items():
+            value = portals[portal].get(setting)
+            if not value or type(default) != type(value):
+                value = default
+            portalsOut[portal][setting] = value
+
+    data["portals"] = portalsOut
 
     with open(configFile, "w") as f:
         json.dump(data, f, indent=4)
@@ -138,6 +176,16 @@ def authorise(f):
         )
 
     return decorated
+
+
+def moveMac(portal, mac):
+    portals = getPortals()
+    macs = portal.get(macs)
+    x = macs.get(mac)
+    del macs[mac]
+    macs[macs] = x
+    portals[portal]["macs"] = macs
+    savePortals(portals)
 
 
 @app.route("/", methods=["GET"])
@@ -301,6 +349,7 @@ def editor_data():
                 except:
                     allChannels = None
                     genres = None
+                    moveMac(portal, mac)
 
             if allChannels and genres:
                 for channel in allChannels:
@@ -466,35 +515,20 @@ def editorReset():
 @authorise
 def settings():
     settings = getSettings()
-    return render_template("settings.html", settings=settings, d_ffmpegcmd=d_ffmpegcmd)
+    return render_template(
+        "settings.html", settings=settings, defaultSettings=defaultSettings
+    )
 
 
 @app.route("/settings/save", methods=["POST"])
 @authorise
 def save():
-    settings = {
-        "stream method": request.form["stream method"],
-        "ffmpeg command": request.form["ffmpeg command"],
-        "ffmpeg timeout": request.form["ffmpeg timeout"],
-        "test streams": request.form["test streams"],
-        "try all macs": request.form["try all macs"],
-        "enable hdhr": request.form["enable hdhr"],
-        "hdhr name": request.form["hdhr name"],
-        "hdhr tuners": request.form["hdhr tuners"],
-        "enable security": request.form["enable security"],
-        "username": request.form["username"],
-        "password": request.form["password"],
-        "hdhr id": getSettings()["hdhr id"],
-        "use channel numbers": request.form["use channel numbers"],
-        "use channel genres": request.form["use channel genres"],
-        "sort playlist by channel genre": request.form[
-            "sort playlist by channel genre"
-        ],
-        "sort playlist by channel name": request.form["sort playlist by channel name"],
-        "sort playlist by channel number": request.form[
-            "sort playlist by channel number"
-        ],
-    }
+    settings = {}
+
+    for setting, _ in defaultSettings.items():
+        value = request.form.get(setting, "false")
+        settings[setting] = value
+
     saveSettings(settings)
     logger.info("Settings saved!")
     flash("Settings saved!", "success")
@@ -528,6 +562,7 @@ def playlist():
                 except:
                     allChannels = None
                     genres = None
+                    moveMac(portal, mac)
 
             if allChannels and genres:
                 for channel in allChannels:
@@ -616,6 +651,7 @@ def xmltv():
                 except:
                     allChannels = None
                     epg = None
+                    moveMac(portal, mac)
 
             if allChannels and epg:
                 for c in allChannels:
@@ -760,7 +796,6 @@ def channel(portalId, channelId):
     url = portal.get("url")
     macs = list(portal["macs"].keys())
     streamsPerMac = int(portal.get("streams per mac"))
-    random.shuffle(macs)
     proxy = portal.get("proxy")
     web = request.args.get("web")
     ip = request.remote_addr
@@ -790,6 +825,7 @@ def channel(portalId, channelId):
                         portalId, mac
                     )
                 )
+                moveMac(portal, mac)
 
         if channels:
             for c in channels:
@@ -881,7 +917,12 @@ def channel(portalId, channelId):
                                         url, mac, token, proxy
                                     )
                                 except:
-                                    pass
+                                    logger.info(
+                                        "Unable to connect to fallback Portal({}) using MAC({})".format(
+                                            portalId, mac
+                                        )
+                                    )
+                                    moveMac(portal, mac)
                                 if channels:
                                     fChannelId = k
                                     for c in channels:
@@ -1062,6 +1103,7 @@ def lineup():
                     break
                 except:
                     allChannels = None
+                    moveMac(portal, mac)
 
             if allChannels:
                 for channel in allChannels:
@@ -1093,6 +1135,6 @@ def lineup():
 
 
 if __name__ == "__main__":
-    config = getConfig()
+    config = loadConfig()
     waitress.serve(app, port=8001, _quiet=True)
     # app.run(host="0.0.0.0", port=8001, debug=debug)
