@@ -203,7 +203,7 @@ def portals():
 @authorise
 def portalsAdd():
     id = uuid.uuid4().hex
-    enabled = request.form.get("enabled", "false")
+    enabled = "true"
     name = request.form["name"]
     url = request.form["url"]
     macs = list(set(request.form["macs"].split(",")))
@@ -1180,5 +1180,5 @@ def lineup():
 
 if __name__ == "__main__":
     config = loadConfig()
-    # waitress.serve(app, port=8001, _quiet=True)
-    app.run(host="0.0.0.0", port=8001, debug=debug)
+    waitress.serve(app, port=8001, _quiet=True)
+    # app.run(host="0.0.0.0", port=8001, debug=debug)
