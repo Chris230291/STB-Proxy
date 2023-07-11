@@ -177,13 +177,13 @@ def authorise(f):
     return decorated
 
 
-def moveMac(portal, mac):
+def moveMac(portalId, mac):
     portals = getPortals()
-    macs = portal.get(macs)
-    x = macs.get(mac)
+    macs = portals[portalId]["macs"]
+    x = macs[mac]
     del macs[mac]
-    macs[macs] = x
-    portals[portal]["macs"] = macs
+    macs[mac] = x
+    portals[portalId]["macs"] = macs
     savePortals(portals)
 
 
@@ -202,23 +202,30 @@ def portals():
 @app.route("/portal/add", methods=["POST"])
 @authorise
 def portalsAdd():
+    id = uuid.uuid4().hex
+    enabled = request.form.get("enabled", "false")
     name = request.form["name"]
     url = request.form["url"]
     macs = list(set(request.form["macs"].split(",")))
     streamsPerMac = request.form["streams per mac"]
     proxy = request.form["proxy"]
-    id = uuid.uuid4().hex
-    if url.endswith(".php") == False:
+
+    if not url.endswith(".php"):
         url = stb.getUrl(url, proxy)
-    working = {}
-    portals = getPortals()
+        if not url:
+            logger.error("Error getting URL for Portal({})".format(name))
+            flash("Error getting URL for Portal({})".format(name), "danger")
+            return redirect("/portals", code=302)
+
+    macsd = {}
+
     for mac in macs:
-        try:
-            token = stb.getToken(url, mac, proxy)
+        token = stb.getToken(url, mac, proxy)
+        if token:
             stb.getProfile(url, mac, token, proxy)
-            if stb.getAllChannels(url, mac, token, proxy):
-                expiry = stb.getExpires(url, mac, token, proxy)
-                working[mac] = expiry
+            expiry = stb.getExpires(url, mac, token, proxy)
+            if expiry:
+                macsd[mac] = expiry
                 logger.info(
                     "Successfully tested MAC({}) for Portal({})".format(mac, name)
                 )
@@ -226,24 +233,33 @@ def portalsAdd():
                     "Successfully tested MAC({}) for Portal({})".format(mac, name),
                     "success",
                 )
-            else:
-                raise Exception
-        except:
-            logger.error("Error testing MAC({}) for Portal({})".format(mac, name))
-            flash("Error testing MAC({}) for Portal({})".format(mac, name), "danger")
-    if len(working) > 0:
-        portals[id] = {
+                continue
+
+        logger.error("Error testing MAC({}) for Portal({})".format(mac, name))
+        flash("Error testing MAC({}) for Portal({})".format(mac, name), "danger")
+
+    if len(macsd) > 0:
+        portal = {
+            "enabled": enabled,
             "name": name,
             "url": url,
-            "macs": working,
+            "macs": macsd,
             "streams per mac": streamsPerMac,
             "proxy": proxy,
         }
+
+        for setting, default in defaultPortal.items():
+            if not portal.get(setting):
+                portal[setting] = default
+
+        portals = getPortals()
+        portals[id] = portal
         savePortals(portals)
-        logger.info("Portal({}) added!".format(name))
+        logger.info("Portal({}) added!".format(portal["name"]))
+
     else:
         logger.error(
-            "None of the accounts tested OK for Portal({}). Adding not successfull".format(
+            "None of the MACs tested OK for Portal({}). Adding not successfull".format(
                 name
             )
         )
@@ -254,46 +270,65 @@ def portalsAdd():
 @app.route("/portal/update", methods=["POST"])
 @authorise
 def portalUpdate():
+    id = request.form["id"]
+    enabled = request.form.get("enabled", "false")
     name = request.form["name"]
     url = request.form["url"]
-    macs = list(set(request.form["macs"].split(",")))
+    newmacs = list(set(request.form["macs"].split(",")))
     streamsPerMac = request.form["streams per mac"]
     proxy = request.form["proxy"]
-    id = request.form["id"]
-    if url.endswith(".php") == False:
+    retest = request.form.get("retest", None)
+
+    if not url.endswith(".php"):
         url = stb.getUrl(url, proxy)
-    working = {}
+        if not url:
+            logger.error("Error getting URL for Portal({})".format(name))
+            flash("Error getting URL for Portal({})".format(name), "danger")
+            return redirect("/portals", code=302)
+
     portals = getPortals()
-    for mac in macs:
-        try:
+    oldmacs = portals[id]["macs"]
+    allmacs = list(set(newmacs + list(oldmacs.keys())))
+    macsout = {}
+
+    for mac in allmacs:
+        if retest or mac not in oldmacs.keys():
             token = stb.getToken(url, mac, proxy)
-            stb.getProfile(url, mac, token, proxy)
-            if stb.getAllChannels(url, mac, token, proxy):
+            if token:
+                stb.getProfile(url, mac, token, proxy)
                 expiry = stb.getExpires(url, mac, token, proxy)
-                working[mac] = expiry
-                logger.info(
-                    "Successfully tested MAC({}) for Portal({})".format(mac, name)
-                )
-                flash(
-                    "Successfully tested MAC({}) for Portal({})".format(mac, name),
-                    "success",
-                )
-            else:
-                raise Exception
-        except:
-            logger.error("Error testing MAC({}) for Portal({})".format(mac, name))
-            flash("Error testing MAC({}) for Portal({})".format(mac, name), "danger")
-    if len(working) > 0:
+                if expiry:
+                    macsout[mac] = expiry
+                    logger.info(
+                        "Successfully tested MAC({}) for Portal({})".format(mac, name)
+                    )
+                    flash(
+                        "Successfully tested MAC({}) for Portal({})".format(mac, name),
+                        "success",
+                    )
+                    continue
+
+        if mac in oldmacs.keys():
+            macsout[mac] = oldmacs[mac]
+            continue
+
+        logger.error("Error testing MAC({}) for Portal({})".format(mac, name))
+        flash("Error testing MAC({}) for Portal({})".format(mac, name), "danger")
+
+    if len(macsout) > 0:
+        portals[id]["enabled"] = enabled
         portals[id]["name"] = name
         portals[id]["url"] = url
-        portals[id]["macs"] = working
+        portals[id]["macs"] = macsout
         portals[id]["streams per mac"] = streamsPerMac
         portals[id]["proxy"] = proxy
         savePortals(portals)
         logger.info("Portal({}) updated!".format(name))
+        flash("Portal({}) updated!".format(name), "success")
+
     else:
         logger.error(
-            "None of the accounts tested OK for Portal({}). Update not successfull".format(
+            "None of the MACs tested OK for Portal({}). Adding not successfull".format(
                 name
             )
         )
@@ -325,8 +360,8 @@ def editor():
 def editor_data():
     channels = []
     portals = getPortals()
-    if len(portals) > 0:
-        for portal in portals:
+    for portal in portals:
+        if portals[portal]["enabled"] == "true":
             portalName = portals[portal]["name"]
             url = portals[portal]["url"]
             macs = list(portals[portal]["macs"].keys())
@@ -348,7 +383,6 @@ def editor_data():
                 except:
                     allChannels = None
                     genres = None
-                    moveMac(portal, mac)
 
             if allChannels and genres:
                 for channel in allChannels:
@@ -540,74 +574,74 @@ def playlist():
     channels = []
     portals = getPortals()
     for portal in portals:
-        enabledChannels = portals[portal].get("enabled channels", [])
-        if len(enabledChannels) != 0:
-            name = portals[portal]["name"]
-            url = portals[portal]["url"]
-            macs = list(portals[portal]["macs"].keys())
-            proxy = portals[portal]["proxy"]
-            customChannelNames = portals[portal].get("custom channel names", {})
-            customGenres = portals[portal].get("custom genres", {})
-            customChannelNumbers = portals[portal].get("custom channel numbers", {})
-            customEpgIds = portals[portal].get("custom epg ids", {})
+        if portals[portal]["enabled"] == "true":
+            enabledChannels = portals[portal].get("enabled channels", [])
+            if len(enabledChannels) != 0:
+                name = portals[portal]["name"]
+                url = portals[portal]["url"]
+                macs = list(portals[portal]["macs"].keys())
+                proxy = portals[portal]["proxy"]
+                customChannelNames = portals[portal].get("custom channel names", {})
+                customGenres = portals[portal].get("custom genres", {})
+                customChannelNumbers = portals[portal].get("custom channel numbers", {})
+                customEpgIds = portals[portal].get("custom epg ids", {})
 
-            for mac in macs:
-                try:
-                    token = stb.getToken(url, mac, proxy)
-                    stb.getProfile(url, mac, token, proxy)
-                    allChannels = stb.getAllChannels(url, mac, token, proxy)
-                    genres = stb.getGenreNames(url, mac, token, proxy)
-                    break
-                except:
-                    allChannels = None
-                    genres = None
-                    moveMac(portal, mac)
+                for mac in macs:
+                    try:
+                        token = stb.getToken(url, mac, proxy)
+                        stb.getProfile(url, mac, token, proxy)
+                        allChannels = stb.getAllChannels(url, mac, token, proxy)
+                        genres = stb.getGenreNames(url, mac, token, proxy)
+                        break
+                    except:
+                        allChannels = None
+                        genres = None
 
-            if allChannels and genres:
-                for channel in allChannels:
-                    channelId = str(channel.get("id"))
-                    if channelId in enabledChannels:
-                        channelName = customChannelNames.get(channelId)
-                        if channelName == None:
-                            channelName = str(channel.get("name"))
-                        genre = customGenres.get(channelId)
-                        if genre == None:
-                            genreId = str(channel.get("tv_genre_id"))
-                            genre = str(genres.get(genreId))
-                        channelNumber = customChannelNumbers.get(channelId)
-                        if channelNumber == None:
-                            channelNumber = str(channel.get("number"))
-                        epgId = customEpgIds.get(channelId)
-                        if epgId == None:
-                            epgId = portal + channelId
-                        channels.append(
-                            "#EXTINF:-1"
-                            + ' tvg-id="'
-                            + epgId
-                            + (
-                                '" tvg-chno="' + channelNumber
-                                if getSettings().get("use channel numbers", "true")
-                                == "true"
-                                else ""
+                if allChannels and genres:
+                    for channel in allChannels:
+                        channelId = str(channel.get("id"))
+                        if channelId in enabledChannels:
+                            channelName = customChannelNames.get(channelId)
+                            if channelName == None:
+                                channelName = str(channel.get("name"))
+                            genre = customGenres.get(channelId)
+                            if genre == None:
+                                genreId = str(channel.get("tv_genre_id"))
+                                genre = str(genres.get(genreId))
+                            channelNumber = customChannelNumbers.get(channelId)
+                            if channelNumber == None:
+                                channelNumber = str(channel.get("number"))
+                            epgId = customEpgIds.get(channelId)
+                            if epgId == None:
+                                epgId = portal + channelId
+                            channels.append(
+                                "#EXTINF:-1"
+                                + ' tvg-id="'
+                                + epgId
+                                + (
+                                    '" tvg-chno="' + channelNumber
+                                    if getSettings().get("use channel numbers", "true")
+                                    == "true"
+                                    else ""
+                                )
+                                + (
+                                    '" group-title="' + genre
+                                    if getSettings().get("use channel genres", "true")
+                                    == "true"
+                                    else ""
+                                )
+                                + '",'
+                                + channelName
+                                + "\n"
+                                + "http://"
+                                + host
+                                + "/play/"
+                                + portal
+                                + "/"
+                                + channelId
                             )
-                            + (
-                                '" group-title="' + genre
-                                if getSettings().get("use channel genres", "true")
-                                == "true"
-                                else ""
-                            )
-                            + '",'
-                            + channelName
-                            + "\n"
-                            + "http://"
-                            + host
-                            + "/play/"
-                            + portal
-                            + "/"
-                            + channelId
-                        )
-            else:
-                logger.error("Error making playlist for {}, skipping".format(name))
+                else:
+                    logger.error("Error making playlist for {}, skipping".format(name))
 
     if getSettings().get("sort playlist by channel name", "true") == "true":
         channels.sort(key=lambda k: k.split(",")[1].split("\n")[0])
@@ -631,74 +665,78 @@ def xmltv():
     programmes = ET.Element("tv")
     portals = getPortals()
     for portal in portals:
-        enabledChannels = portals[portal].get("enabled channels", [])
-        if len(enabledChannels) != 0:
-            name = portals[portal]["name"]
-            url = portals[portal]["url"]
-            macs = list(portals[portal]["macs"].keys())
-            proxy = portals[portal]["proxy"]
-            customChannelNames = portals[portal].get("custom channel names", {})
-            customEpgIds = portals[portal].get("custom epg ids", {})
+        if portals[portal]["enabled"] == "true":
+            enabledChannels = portals[portal].get("enabled channels", [])
+            if len(enabledChannels) != 0:
+                name = portals[portal]["name"]
+                url = portals[portal]["url"]
+                macs = list(portals[portal]["macs"].keys())
+                proxy = portals[portal]["proxy"]
+                customChannelNames = portals[portal].get("custom channel names", {})
+                customEpgIds = portals[portal].get("custom epg ids", {})
 
-            for mac in macs:
-                try:
-                    token = stb.getToken(url, mac, proxy)
-                    stb.getProfile(url, mac, token, proxy)
-                    allChannels = stb.getAllChannels(url, mac, token, proxy)
-                    epg = stb.getEpg(url, mac, token, 24, proxy)
-                    break
-                except:
-                    allChannels = None
-                    epg = None
-                    moveMac(portal, mac)
-
-            if allChannels and epg:
-                for c in allChannels:
+                for mac in macs:
                     try:
-                        channelId = c.get("id")
-                        if str(channelId) in enabledChannels:
-                            channelName = customChannelNames.get(str(channelId))
-                            if channelName == None:
-                                channelName = str(c.get("name"))
-                            epgId = customEpgIds.get(channelId)
-                            if epgId == None:
-                                epgId = portal + channelId
-                            channelEle = ET.SubElement(channels, "channel", id=epgId)
-                            ET.SubElement(channelEle, "display-name").text = channelName
-                            ET.SubElement(channelEle, "icon", src=c.get("logo"))
-                            for p in epg.get(channelId):
-                                try:
-                                    start = (
-                                        datetime.utcfromtimestamp(
-                                            p.get("start_timestamp")
-                                        ).strftime("%Y%m%d%H%M%S")
-                                        + " +0000"
-                                    )
-                                    stop = (
-                                        datetime.utcfromtimestamp(
-                                            p.get("stop_timestamp")
-                                        ).strftime("%Y%m%d%H%M%S")
-                                        + " +0000"
-                                    )
-                                    programmeEle = ET.SubElement(
-                                        programmes,
-                                        "programme",
-                                        start=start,
-                                        stop=stop,
-                                        channel=epgId,
-                                    )
-                                    ET.SubElement(programmeEle, "title").text = p.get(
-                                        "name"
-                                    )
-                                    ET.SubElement(programmeEle, "desc").text = p.get(
-                                        "descr"
-                                    )
-                                except:
-                                    pass
+                        token = stb.getToken(url, mac, proxy)
+                        stb.getProfile(url, mac, token, proxy)
+                        allChannels = stb.getAllChannels(url, mac, token, proxy)
+                        epg = stb.getEpg(url, mac, token, 24, proxy)
+                        break
                     except:
-                        pass
-            else:
-                logger.error("Error making XMLTV for {}, skipping".format(name))
+                        allChannels = None
+                        epg = None
+
+                if allChannels and epg:
+                    for c in allChannels:
+                        try:
+                            channelId = c.get("id")
+                            if str(channelId) in enabledChannels:
+                                channelName = customChannelNames.get(str(channelId))
+                                if channelName == None:
+                                    channelName = str(c.get("name"))
+                                epgId = customEpgIds.get(channelId)
+                                if epgId == None:
+                                    epgId = portal + channelId
+                                channelEle = ET.SubElement(
+                                    channels, "channel", id=epgId
+                                )
+                                ET.SubElement(
+                                    channelEle, "display-name"
+                                ).text = channelName
+                                ET.SubElement(channelEle, "icon", src=c.get("logo"))
+                                for p in epg.get(channelId):
+                                    try:
+                                        start = (
+                                            datetime.utcfromtimestamp(
+                                                p.get("start_timestamp")
+                                            ).strftime("%Y%m%d%H%M%S")
+                                            + " +0000"
+                                        )
+                                        stop = (
+                                            datetime.utcfromtimestamp(
+                                                p.get("stop_timestamp")
+                                            ).strftime("%Y%m%d%H%M%S")
+                                            + " +0000"
+                                        )
+                                        programmeEle = ET.SubElement(
+                                            programmes,
+                                            "programme",
+                                            start=start,
+                                            stop=stop,
+                                            channel=epgId,
+                                        )
+                                        ET.SubElement(
+                                            programmeEle, "title"
+                                        ).text = p.get("name")
+                                        ET.SubElement(
+                                            programmeEle, "desc"
+                                        ).text = p.get("descr")
+                                    except:
+                                        pass
+                        except:
+                            pass
+                else:
+                    logger.error("Error making XMLTV for {}, skipping".format(name))
 
     xmltv = channels
     for programme in programmes.iter("programme"):
@@ -752,6 +790,9 @@ def channel(portalId, channelId):
                 while True:
                     chunk = ffmpeg_sp.stdout.read(1024)
                     if len(chunk) == 0:
+                        if ffmpeg_sp.poll() != 0:
+                            logger.info("Ffmpeg closed with error({}). Moving MAC({}) for Portal({})".format(str(ffmpeg_sp.poll()), mac, portalName))
+                            moveMac(portalId, mac)
                         break
                     yield chunk
         except:
@@ -806,25 +847,18 @@ def channel(portalId, channelId):
     freeMac = False
 
     for mac in macs:
-        channels = False
+        channels = None
         cmd = None
         link = None
         if streamsPerMac == 0 or isMacFree():
             logger.info(
                 "Trying Portal({}):MAC({}):Channel({})".format(portalId, mac, channelId)
             )
-            try:
-                token = stb.getToken(url, mac, proxy)
+            freeMac = True
+            token = stb.getToken(url, mac, proxy)
+            if token:
                 stb.getProfile(url, mac, token, proxy)
                 channels = stb.getAllChannels(url, mac, token, proxy)
-                freeMac = True
-            except:
-                logger.info(
-                    "Unable to connect to Portal({}) using MAC({})".format(
-                        portalId, mac
-                    )
-                )
-                moveMac(portal, mac)
 
         if channels:
             for c in channels:
@@ -885,6 +919,12 @@ def channel(portalId, channelId):
                         logger.info("Redirect sent")
                         return redirect(link)
 
+        logger.info(
+            "Unable to connect to Portal({}) using MAC({})".format(portalId, mac)
+        )
+        logger.info("Moving MAC({}) for Portal({})".format(mac, portalName))
+        moveMac(portalId, mac)
+
         if not getSettings().get("try all macs", "false") == "true":
             break
 
@@ -897,93 +937,98 @@ def channel(portalId, channelId):
 
         portals = getPortals()
         for portal in portals:
-            fallbackChannels = portals[portal]["fallback channels"]
-            if channelName in fallbackChannels.values():
-                url = portals[portal].get("url")
-                macs = list(portals[portal]["macs"].keys())
-                proxy = portals[portal].get("proxy")
-                for mac in macs:
-                    channels = None
-                    cmd = None
-                    link = None
-                    if streamsPerMac == 0 or isMacFree():
-                        for k, v in fallbackChannels.items():
-                            if v == channelName:
-                                try:
-                                    token = stb.getToken(url, mac, proxy)
-                                    stb.getProfile(url, mac, token, proxy)
-                                    channels = stb.getAllChannels(
-                                        url, mac, token, proxy
-                                    )
-                                except:
-                                    logger.info(
-                                        "Unable to connect to fallback Portal({}) using MAC({})".format(
-                                            portalId, mac
+            if portals[portal]["enabled"] == "true":
+                fallbackChannels = portals[portal]["fallback channels"]
+                if channelName in fallbackChannels.values():
+                    url = portals[portal].get("url")
+                    macs = list(portals[portal]["macs"].keys())
+                    proxy = portals[portal].get("proxy")
+                    for mac in macs:
+                        channels = None
+                        cmd = None
+                        link = None
+                        if streamsPerMac == 0 or isMacFree():
+                            for k, v in fallbackChannels.items():
+                                if v == channelName:
+                                    try:
+                                        token = stb.getToken(url, mac, proxy)
+                                        stb.getProfile(url, mac, token, proxy)
+                                        channels = stb.getAllChannels(
+                                            url, mac, token, proxy
                                         )
-                                    )
-                                    moveMac(portal, mac)
-                                if channels:
-                                    fChannelId = k
-                                    for c in channels:
-                                        if str(c["id"]) == fChannelId:
-                                            cmd = c["cmd"]
-                                            break
-                                    if cmd:
-                                        if "http://localhost/" in cmd:
-                                            link = stb.getLink(
-                                                url, mac, token, cmd, proxy
+                                    except:
+                                        logger.info(
+                                            "Unable to connect to fallback Portal({}) using MAC({})".format(
+                                                portalId, mac
                                             )
-                                        else:
-                                            link = cmd.split(" ")[1]
-                                        if link:
-                                            if testStream():
-                                                logger.info(
-                                                    "Fallback found for Portal({}):Channel({})".format(
-                                                        portalId, channelId
-                                                    )
+                                        )
+                                    if channels:
+                                        fChannelId = k
+                                        for c in channels:
+                                            if str(c["id"]) == fChannelId:
+                                                cmd = c["cmd"]
+                                                break
+                                        if cmd:
+                                            if "http://localhost/" in cmd:
+                                                link = stb.getLink(
+                                                    url, mac, token, cmd, proxy
                                                 )
-                                                if (
-                                                    getSettings().get(
-                                                        "stream method", "ffmpeg"
+                                            else:
+                                                link = cmd.split(" ")[1]
+                                            if link:
+                                                if testStream():
+                                                    logger.info(
+                                                        "Fallback found for Portal({}):Channel({})".format(
+                                                            portalId, channelId
+                                                        )
                                                     )
-                                                    == "ffmpeg"
-                                                ):
-                                                    ffmpegcmd = str(
-                                                        getSettings()["ffmpeg command"]
-                                                    )
-                                                    ffmpegcmd = ffmpegcmd.replace(
-                                                        "<url>", link
-                                                    )
-                                                    ffmpegcmd = ffmpegcmd.replace(
-                                                        "<timeout>",
-                                                        str(
-                                                            int(
-                                                                getSettings()[
-                                                                    "ffmpeg timeout"
-                                                                ]
-                                                            )
-                                                            * int(1000000)
-                                                        ),
-                                                    )
-                                                    if proxy:
+                                                    if (
+                                                        getSettings().get(
+                                                            "stream method", "ffmpeg"
+                                                        )
+                                                        == "ffmpeg"
+                                                    ):
+                                                        ffmpegcmd = str(
+                                                            getSettings()[
+                                                                "ffmpeg command"
+                                                            ]
+                                                        )
                                                         ffmpegcmd = ffmpegcmd.replace(
-                                                            "<proxy>", proxy
+                                                            "<url>", link
+                                                        )
+                                                        ffmpegcmd = ffmpegcmd.replace(
+                                                            "<timeout>",
+                                                            str(
+                                                                int(
+                                                                    getSettings()[
+                                                                        "ffmpeg timeout"
+                                                                    ]
+                                                                )
+                                                                * int(1000000)
+                                                            ),
+                                                        )
+                                                        if proxy:
+                                                            ffmpegcmd = (
+                                                                ffmpegcmd.replace(
+                                                                    "<proxy>", proxy
+                                                                )
+                                                            )
+                                                        else:
+                                                            ffmpegcmd = ffmpegcmd.replace(
+                                                                "-http_proxy <proxy>",
+                                                                "",
+                                                            )
+                                                        " ".join(
+                                                            ffmpegcmd.split()
+                                                        )  # cleans up multiple whitespaces
+                                                        ffmpegcmd = ffmpegcmd.split()
+                                                        return Response(
+                                                            streamData(),
+                                                            mimetype="application/octet-stream",
                                                         )
                                                     else:
-                                                        ffmpegcmd = ffmpegcmd.replace(
-                                                            "-http_proxy <proxy>", ""
-                                                        )
-                                                    " ".join(
-                                                        ffmpegcmd.split()
-                                                    )  # cleans up multiple whitespaces
-                                                    ffmpegcmd = ffmpegcmd.split()
-                                                    return Response(
-                                                        streamData(),
-                                                        mimetype="application/octet-stream",
-                                                    )
-                                                else:
-                                                    logger.info("Redirect sent")
-                                                    return redirect(link)
+                                                        logger.info("Redirect sent")
+                                                        return redirect(link)
 
     if freeMac:
         logger.info(
@@ -993,7 +1038,7 @@ def channel(portalId, channelId):
         )
     else:
         logger.info(
-            "No free working MAC for Portal({}):Channel({})".format(portalId, channelId)
+            "No free MAC for Portal({}):Channel({})".format(portalId, channelId)
         )
 
     return make_response("No streams available", 503)
@@ -1085,55 +1130,55 @@ def lineup():
     lineup = []
     portals = getPortals()
     for portal in portals:
-        enabledChannels = portals[portal].get("enabled channels", [])
-        if len(enabledChannels) != 0:
-            name = portals[portal]["name"]
-            url = portals[portal]["url"]
-            macs = list(portals[portal]["macs"].keys())
-            proxy = portals[portal]["proxy"]
-            customChannelNames = portals[portal].get("custom channel names", {})
-            customChannelNumbers = portals[portal].get("custom channel numbers", {})
+        if portals[portal]["enabled"] == "true":
+            enabledChannels = portals[portal].get("enabled channels", [])
+            if len(enabledChannels) != 0:
+                name = portals[portal]["name"]
+                url = portals[portal]["url"]
+                macs = list(portals[portal]["macs"].keys())
+                proxy = portals[portal]["proxy"]
+                customChannelNames = portals[portal].get("custom channel names", {})
+                customChannelNumbers = portals[portal].get("custom channel numbers", {})
 
-            for mac in macs:
-                try:
-                    token = stb.getToken(url, mac, proxy)
-                    stb.getProfile(url, mac, token, proxy)
-                    allChannels = stb.getAllChannels(url, mac, token, proxy)
-                    break
-                except:
-                    allChannels = None
-                    moveMac(portal, mac)
+                for mac in macs:
+                    try:
+                        token = stb.getToken(url, mac, proxy)
+                        stb.getProfile(url, mac, token, proxy)
+                        allChannels = stb.getAllChannels(url, mac, token, proxy)
+                        break
+                    except:
+                        allChannels = None
 
-            if allChannels:
-                for channel in allChannels:
-                    channelId = str(channel.get("id"))
-                    if channelId in enabledChannels:
-                        channelName = customChannelNames.get(channelId)
-                        if channelName == None:
-                            channelName = str(channel.get("name"))
-                        channelNumber = customChannelNumbers.get(channelId)
-                        if channelNumber == None:
-                            channelNumber = str(channel.get("number"))
+                if allChannels:
+                    for channel in allChannels:
+                        channelId = str(channel.get("id"))
+                        if channelId in enabledChannels:
+                            channelName = customChannelNames.get(channelId)
+                            if channelName == None:
+                                channelName = str(channel.get("name"))
+                            channelNumber = customChannelNumbers.get(channelId)
+                            if channelNumber == None:
+                                channelNumber = str(channel.get("number"))
 
-                        lineup.append(
-                            {
-                                "GuideNumber": channelNumber,
-                                "GuideName": channelName,
-                                "URL": "http://"
-                                + host
-                                + "/play/"
-                                + portal
-                                + "/"
-                                + channelId,
-                            }
-                        )
-            else:
-                logger.error("Error making lineup for {}, skipping".format(name))
+                            lineup.append(
+                                {
+                                    "GuideNumber": channelNumber,
+                                    "GuideName": channelName,
+                                    "URL": "http://"
+                                    + host
+                                    + "/play/"
+                                    + portal
+                                    + "/"
+                                    + channelId,
+                                }
+                            )
+                else:
+                    logger.error("Error making lineup for {}, skipping".format(name))
 
     return flask.jsonify(lineup)
 
 
 if __name__ == "__main__":
     config = loadConfig()
-    waitress.serve(app, port=8001, _quiet=True)
-    # app.run(host="0.0.0.0", port=8001, debug=debug)
+    # waitress.serve(app, port=8001, _quiet=True)
+    app.run(host="0.0.0.0", port=8001, debug=debug)

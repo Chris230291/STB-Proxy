@@ -20,11 +20,14 @@
 
             <div class="card text-dark bg-light mb-3">
                 <div class="card-header btn text-start stretched-link" data-id="{{ portal }}"
-                    data-name="{{ portals[portal].name }}" data-url="{{ portals[portal].url }}"
-                    data-proxy="{{ portals[portal].proxy }}" data-macs="{{ portals[portal].macs|join(',') }}"
+                    data-enabled="{{ portals[portal].enabled }}" data-name="{{ portals[portal].name }}"
+                    data-url="{{ portals[portal].url }}" data-proxy="{{ portals[portal].proxy }}"
+                    data-macs="{{ portals[portal].macs|join(',') }}"
                     data-streamsPerMac="{{ portals[portal]['streams per mac'] }}" data-bs-toggle="modal"
                     data-bs-target="#modalEdit">
-                    <i class="me-2 fa fa-server"></i>{{ portals[portal].name }}
+                    <i class="me-2 fa fa-server"{{ "hidden" if portals[portal].enabled =='false' }}></i>
+                    <i class="me-2 fa fa-ban"{{ "hidden" if portals[portal].enabled =='true' }}></i>
+                    {{ portals[portal].name }}
                 </div>
                 <div class="card-body">
                     <table class="table table-sm mt-2">
@@ -112,12 +115,17 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title">Edit Portal</h5>
+                <div class="form-check form-switch ms-auto">
+                    <input type="checkbox" form="update" class="checkbox form-check-input" name="enabled" id="editEnabled"
+                        value="true">
+                </div>
             </div>
             <div class="modal-body">
 
-                <form action="/portal/update" method="post">
+                <form id="update" action="/portal/update" method="post">
 
-                    <input name="id" id="editId" class="form-control flex-fill" hidden>
+                    <input name="id" id="editId" hidden>
+                    <input type="checkbox" name="retest" id="retest" value="true" hidden>
 
                     <h6>Name:</h6>
                     <input type="text" name="name" id="editName" class="form-control flex-fill" title="Name" required>
@@ -156,12 +164,14 @@
                         <button class="btn btn-danger me-auto" title="Delete" form="delete"
                             id="deleteName">Delete</button>
                         <button class="btn btn-secondary" title="Cancel" data-bs-dismiss="modal">Cancel</button>
+                        <button type="button" class="btn btn-success" title="Retest" onclick="retestSave()">Retest</button>
                         <button class="btn btn-success" title="Save">Save</button>
                     </div>
 
                 </form>
 
-                <form id="delete" action="/portal/remove" method="post" onsubmit="return confirm('Confirm Delete');" hidden>
+                <form id="delete" action="/portal/remove" method="post" onsubmit="return confirm('Confirm Delete');"
+                    hidden>
                     <input type="text" name="deleteId" id="deleteId" value="">
                 </form>
 
@@ -190,12 +200,18 @@
     editModal.addEventListener('show.bs.modal', function (event) {
         var button = event.relatedTarget;
         var id = button.getAttribute('data-id');
+        var enabled = button.getAttribute('data-enabled');
         var name = button.getAttribute('data-name');
         var url = button.getAttribute('data-url');
         var proxy = button.getAttribute('data-proxy');
         var macs = button.getAttribute('data-macs');
         var streamsPerMac = button.getAttribute('data-streamsPerMac');
         document.getElementById('editId').value = id;
+        if (enabled == "true") {
+            document.getElementById('editEnabled').checked = true;
+        } else {
+            document.getElementById('editEnabled').checked = false;
+        }
         document.getElementById('editName').value = name;
         document.getElementById('editUrl').value = url;
         document.getElementById('editProxy').value = proxy;
@@ -203,7 +219,13 @@
         document.getElementById('editStreamsPerMac').value = streamsPerMac;
         document.getElementById('deleteId').value = id;
         document.getElementById('deleteName').value = name;
+        document.getElementById('retest').checked = false;
     })
+
+    function retestSave() {
+        document.getElementById('retest').checked = true;
+        document.getElementById("update").submit();
+    }
 
 </script>
 

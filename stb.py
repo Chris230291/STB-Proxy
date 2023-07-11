@@ -50,6 +50,18 @@ def getUrl(url, proxy=None):
     except:
         pass
 
+    # sometimes these pages dont like proxies!
+    try:
+        for i in urls:
+            try:
+                response = s.get(url + i, headers=headers)
+            except:
+                response = None
+            if response:
+                return parseResponse(url + i, response)
+    except:
+        pass
+
 
 def getToken(url, mac, proxy=None):
     proxies = {"http": proxy, "https": proxy}
@@ -109,7 +121,6 @@ def getExpires(url, mac, token, proxy=None):
             return expires
     except:
         pass
-    return "Unkown"
 
 
 def getAllChannels(url, mac, token, proxy=None):
