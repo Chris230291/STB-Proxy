@@ -83,10 +83,9 @@ defaultPortal = {
     "macs": {},
     "streams per mac": "1",
     "proxy": "",
-    "enabled groups": [],
-    "custom group names": {},
     "enabled channels": [],
     "custom channel names": {},
+    "custom genres": {},
     "custom epg ids": {},
     "fallback channels": {},
 }
