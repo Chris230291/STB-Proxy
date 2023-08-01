@@ -790,9 +790,6 @@ def channel(portalId, channelId):
                 while True:
                     chunk = ffmpeg_sp.stdout.read(1024)
                     if len(chunk) == 0:
-                        if ffmpeg_sp.poll() != 0:
-                            logger.info("Ffmpeg closed with error({}). Moving MAC({}) for Portal({})".format(str(ffmpeg_sp.poll()), mac, portalName))
-                            moveMac(portalId, mac)
                         break
                     yield chunk
         except:
