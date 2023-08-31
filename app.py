@@ -85,6 +85,7 @@ defaultPortal = {
     "proxy": "",
     "enabled channels": [],
     "custom channel names": {},
+    "custom channel numbers": {},
     "custom genres": {},
     "custom epg ids": {},
     "fallback channels": {},
