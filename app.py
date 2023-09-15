@@ -289,10 +289,9 @@ def portalUpdate():
 
     portals = getPortals()
     oldmacs = portals[id]["macs"]
-    allmacs = list(set(newmacs + list(oldmacs.keys())))
     macsout = {}
 
-    for mac in allmacs:
+    for mac in newmacs:
         if retest or mac not in oldmacs.keys():
             token = stb.getToken(url, mac, proxy)
             if token:
@@ -1181,5 +1180,5 @@ def lineup():
 
 if __name__ == "__main__":
     config = loadConfig()
-    waitress.serve(app, port=8001, _quiet=True, threads=24)
-    # app.run(host="0.0.0.0", port=8001, debug=debug)
+    # waitress.serve(app, port=8001, _quiet=True, threads=24)
+    app.run(host="0.0.0.0", port=8001, debug=debug)
