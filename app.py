@@ -290,6 +290,7 @@ def portalUpdate():
     portals = getPortals()
     oldmacs = portals[id]["macs"]
     macsout = {}
+    deadmacs = []
 
     for mac in newmacs:
         if retest or mac not in oldmacs.keys():
@@ -306,9 +307,10 @@ def portalUpdate():
                         "Successfully tested MAC({}) for Portal({})".format(mac, name),
                         "success",
                     )
-                    continue
+            if mac not in macsout.keys():
+                deadmacs.append(mac)
 
-        if mac in oldmacs.keys():
+        if mac in oldmacs.keys() and mac not in deadmacs:
             macsout[mac] = oldmacs[mac]
             continue
 
