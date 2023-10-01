@@ -1,0 +1,14 @@
+version: '3.4'
+
+services:
+  stbproxy:
+    image: stbproxy
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+      target: release
+    volumes:
+        - ./config:/config
+    ports:
+        - 8001:8001   #publish port for stb-proxy container
+    restart: unless-stopped

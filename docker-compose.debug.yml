@@ -1,0 +1,16 @@
+version: '3.4'
+
+services:
+  stbproxy:
+    image: stbproxy
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+      target: debug
+    environment:
+      - DEBUG_MODE=1
+    command: ["sh", "-c", "pip install debugpy -t /tmp && python /tmp/debugpy --wait-for-client --listen 0.0.0.0:5678 app.py "]
+    ports:
+      - 8001:8001     #publish port for stb-proxy container
+      - 5678:5678     #publish port for debuger
+    restart: always

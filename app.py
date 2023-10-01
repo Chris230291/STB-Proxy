@@ -15,6 +15,7 @@ from flask import (
     make_response,
     flash,
 )
+import time
 from datetime import datetime, timezone
 from functools import wraps
 import secrets
@@ -46,10 +47,8 @@ if os.getenv("CONFIG"):
 else:
     configFile = os.path.join(basePath, "config.json")
 
-if os.getenv("DEBUG"):
-    debug = bool(os.getenv("DEBUG"))
-else:
-    debug = True
+debug_str = os.getenv("DEBUG_MODE")
+debug = debug_str.lower() == 'true' or debug_str == '1'
 
 occupied = {}
 config = {}
@@ -787,14 +786,21 @@ def channel(portalId, channelId):
                 ffmpegcmd,
                 stdin=subprocess.DEVNULL,
                 stdout=subprocess.PIPE,
-                stderr=subprocess.DEVNULL,
+                stderr=subprocess.PIPE,
             ) as ffmpeg_sp:
                 while True:
                     chunk = ffmpeg_sp.stdout.read(1024)
                     if len(chunk) == 0:
-                        if ffmpeg_sp.poll() != 0:
-                            logger.info("Ffmpeg closed with error({}). Moving MAC({}) for Portal({})".format(str(ffmpeg_sp.poll()), mac, portalName))
+                        stderr_output = ffmpeg_sp.stderr.read().decode("utf-8")
+                        if "I/O error" in stderr_output:
+                            logger.info("Stream to peer ({}) closed by server of Portal ({}). Mac address might be over-allocated.".format(ip, portalName))
+                            logger.info("Moving MAC({}) for Portal({})".format(mac, portalName))
                             moveMac(portalId, mac)
+                        else:
+                            logger.info("Stream of ffmpeg process stopped with unknown error:\n{}".format(stderr_output))
+                        # check if ffmpeg process has closed
+                        if ffmpeg_sp.poll() != 0:
+                            logger.info("Ffmpeg process closed enexpectedly with return / error code ({}).".format(str(ffmpeg_sp.poll())))
                         break
                     yield chunk
         except:
@@ -824,14 +830,17 @@ def channel(portalId, channelId):
                 return False
 
     def isMacFree():
-        count = 0
-        for i in occupied.get(portalId, []):
-            if i["mac"] == mac:
-                count = count + 1
-        if count < streamsPerMac:
-            return True
-        else:
-            return False
+        # when zapping, it takes a while until the stream and with it the mac is released again. 
+        for _ in range(50):  # Wait max 5 s
+            count = 0
+            for i in occupied.get(portalId, []):
+                if i["mac"] == mac:
+                    count = count + 1
+            if count < streamsPerMac:
+                return True
+            else:
+                time.sleep(0.1)
+        return False 
 
     portal = getPortals().get(portalId)
     portalName = portal.get("name")
@@ -861,7 +870,10 @@ def channel(portalId, channelId):
             if token:
                 stb.getProfile(url, mac, token, proxy)
                 channels = stb.getAllChannels(url, mac, token, proxy)
-
+        else:
+            logger.info(
+                "Maximum streams for MAC({}) in use.".format(mac)
+            )
         if channels:
             for c in channels:
                 if str(c["id"]) == channelId:
@@ -1182,5 +1194,9 @@ def lineup():
 
 if __name__ == "__main__":
     config = loadConfig()
-    waitress.serve(app, port=8001, _quiet=True, threads=24)
-    # app.run(host="0.0.0.0", port=8001, debug=debug)
+    if debug:
+        # If DEBUG is active, use default flask development sever in debug mode
+        app.run(host="0.0.0.0", port=8001, debug=debug)
+    else:
+        # On release use waitress server with multi-threading
+        waitress.serve(app, port=8001, _quiet=True, threads=24)

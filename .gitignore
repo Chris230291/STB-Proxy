@@ -4,3 +4,5 @@ config.json
 STB-Proxy.log
 changenotes.txt
 .vscode
+config/*.*
+docker-compose.debug-vpn.yml
