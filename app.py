@@ -46,10 +46,13 @@ if os.getenv("CONFIG"):
     configFile = os.getenv("CONFIG")
 else:
     configFile = os.path.join(basePath, "config.json")
-
-debug_str = os.getenv("DEBUG_MODE")
-debug = debug_str.lower() == 'true' or debug_str == '1'
-
+    
+if os.getenv("DEBUG_MODE"):
+    debug_str = os.getenv("DEBUG_MODE")
+    debug = debug_str.lower() == 'true' or debug_str == '1'
+else:
+    debug = False
+    
 occupied = {}
 config = {}
 
