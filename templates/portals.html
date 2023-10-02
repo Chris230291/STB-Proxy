@@ -24,6 +24,7 @@
                     data-url="{{ portals[portal].url }}" data-proxy="{{ portals[portal].proxy }}"
                     data-macs="{{ portals[portal].macs|join(',') }}"
                     data-streamsPerMac="{{ portals[portal]['streams per mac'] }}" data-bs-toggle="modal"
+                    data-epgTimeOffset="{{ portals[portal].epgTimeOffset }}"
                     data-bs-target="#modalEdit">
                     <i class="me-2 fa fa-server"{{ "hidden" if portals[portal].enabled =='false' }}></i>
                     <i class="me-2 fa fa-ban"{{ "hidden" if portals[portal].enabled =='true' }}></i>
@@ -97,6 +98,13 @@
 
                     <br><br>
 
+                    <h6>EPG Time Offset:</h6>
+                    <input type="number" name="epg time offset" class="form-control flex-fill" title="EPG Time Offset" 
+                        min="-12" max="14" step="0.5" value="0" required>
+                    <span class="text-muted">Time offset for XMLTV EPG data (Reference UTC).</span>
+
+                    <br><br>
+
                     <div class="modal-footer">
                         <button class="btn btn-secondary" title="Cancel" data-bs-dismiss="modal">Cancel</button>
                         <button class="btn btn-success btn-block" title="Add">Add</button>
@@ -160,6 +168,13 @@
 
                     <br><br>
 
+                    <h6>EPG Time Offset:</h6>
+                    <input type="number" name="epg time offset" id="editEpgTimeOffset" class="form-control flex-fill"
+                        title="EPG Time Offset" min="-12" max="14" step="0.5" value="0" required>
+                    <span class="text-muted">Time offset for XMLTV EPG data (Reference UTC).</span>
+
+                    <br><br>
+
                     <div class="modal-footer">
                         <button class="btn btn-danger me-auto" title="Delete" form="delete"
                             id="deleteName">Delete</button>
@@ -206,6 +221,7 @@
         var proxy = button.getAttribute('data-proxy');
         var macs = button.getAttribute('data-macs');
         var streamsPerMac = button.getAttribute('data-streamsPerMac');
+        var epgTimeOffset = button.getAttribute('data-epgTimeOffset');
         document.getElementById('editId').value = id;
         if (enabled == "true") {
             document.getElementById('editEnabled').checked = true;
@@ -217,6 +233,7 @@
         document.getElementById('editProxy').value = proxy;
         document.getElementById('editMacs').value = macs;
         document.getElementById('editStreamsPerMac').value = streamsPerMac;
+        document.getElementById('editEpgTimeOffset').value = epgTimeOffset;
         document.getElementById('deleteId').value = id;
         document.getElementById('deleteName').value = name;
         document.getElementById('retest').checked = false;

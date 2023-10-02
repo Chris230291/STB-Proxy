@@ -1,4 +1,5 @@
 import flask
+import threading
 import stb
 import os
 import json
@@ -14,6 +15,7 @@ from flask import (
     Response,
     make_response,
     flash,
+    stream_with_context
 )
 import time
 from datetime import datetime, timezone
@@ -25,7 +27,6 @@ app = Flask(__name__)
 app.secret_key = secrets.token_urlsafe(32)
 
 logger = logging.getLogger("STB-Proxy")
-logger.setLevel(logging.INFO)
 logFormat = logging.Formatter("%(asctime)s [%(levelname)s] %(message)s")
 fileHandler = logging.FileHandler("STB-Proxy.log")
 fileHandler.setFormatter(logFormat)
@@ -52,7 +53,13 @@ if os.getenv("DEBUG_MODE"):
     debug = debug_str.lower() == 'true' or debug_str == '1'
 else:
     debug = False
-    
+
+# Set log level
+if debug:
+    logger.setLevel(logging.DEBUG)
+else:
+    logger.setLevel(logging.INFO)
+
 occupied = {}
 config = {}
 
@@ -84,6 +91,7 @@ defaultPortal = {
     "url": "",
     "macs": {},
     "streams per mac": "1",
+    "epgTimeOffset": "0",
     "proxy": "",
     "enabled channels": [],
     "custom channel names": {},
@@ -211,6 +219,7 @@ def portalsAdd():
     url = request.form["url"]
     macs = list(set(request.form["macs"].split(",")))
     streamsPerMac = request.form["streams per mac"]
+    epgTimeOffset = request.form["epg time offset"]
     proxy = request.form["proxy"]
 
     if not url.endswith(".php"):
@@ -248,6 +257,7 @@ def portalsAdd():
             "url": url,
             "macs": macsd,
             "streams per mac": streamsPerMac,
+            "epgTimeOffset": epgTimeOffset,
             "proxy": proxy,
         }
 
@@ -279,6 +289,7 @@ def portalUpdate():
     url = request.form["url"]
     newmacs = list(set(request.form["macs"].split(",")))
     streamsPerMac = request.form["streams per mac"]
+    epgTimeOffset = request.form["epg time offset"]
     proxy = request.form["proxy"]
     retest = request.form.get("retest", None)
 
@@ -325,6 +336,7 @@ def portalUpdate():
         portals[id]["url"] = url
         portals[id]["macs"] = macsout
         portals[id]["streams per mac"] = streamsPerMac
+        portals[id]["epgTimeOffset"] = epgTimeOffset
         portals[id]["proxy"] = proxy
         savePortals(portals)
         logger.info("Portal({}) updated!".format(name))
@@ -665,6 +677,16 @@ def playlist():
 @app.route("/xmltv", methods=["GET"])
 @authorise
 def xmltv():
+    
+    def float_to_time_stamp(decimal_hours):
+        hours = int(decimal_hours)
+        minutes = int((decimal_hours - hours) * 60)
+        
+        sign = '+' if hours >= 0 else '-'
+        hours = abs(hours)
+        
+        return f"{sign}{hours:02d}{minutes:02d}"
+    
     channels = ET.Element("tv")
     programmes = ET.Element("tv")
     portals = getPortals()
@@ -676,6 +698,7 @@ def xmltv():
                 url = portals[portal]["url"]
                 macs = list(portals[portal]["macs"].keys())
                 proxy = portals[portal]["proxy"]
+                epgTimeOffset = float(portals[portal]["epgTimeOffset"])
                 customChannelNames = portals[portal].get("custom channel names", {})
                 customEpgIds = portals[portal].get("custom epg ids", {})
 
@@ -714,13 +737,13 @@ def xmltv():
                                             datetime.utcfromtimestamp(
                                                 p.get("start_timestamp")
                                             ).strftime("%Y%m%d%H%M%S")
-                                            + " +0000"
+                                            + " " + float_to_time_stamp(epgTimeOffset)
                                         )
                                         stop = (
                                             datetime.utcfromtimestamp(
                                                 p.get("stop_timestamp")
                                             ).strftime("%Y%m%d%H%M%S")
-                                            + " +0000"
+                                            + " " + float_to_time_stamp(epgTimeOffset)
                                         )
                                         programmeEle = ET.SubElement(
                                             programmes,
@@ -782,7 +805,20 @@ def channel(portalId, channelId):
             )
             logger.info("Unoccupied Portal({}):MAC({})".format(portalId, mac))
 
+        def read_stderr(ffmpeg_sp, last_stderr):
+            while True:
+                line = ffmpeg_sp.stderr.readline()
+                if not line:
+                    break
+                # Decode new line and keep latest 10 lines
+                stderr_text = line.decode('utf-8').strip()
+                logger.debug("FFMPEG stderr: " + stderr_text)
+                last_stderr.append(stderr_text)
+                if len(last_stderr) > 10: 
+                    last_stderr.pop(0) 
+                    
         try:
+            last_stderr = [] # list to save the last stderr output
             startTime = datetime.now(timezone.utc).timestamp()
             occupy()
             with subprocess.Popen(
@@ -791,25 +827,42 @@ def channel(portalId, channelId):
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
             ) as ffmpeg_sp:
+                stderr_thread = threading.Thread(target=read_stderr, args=(ffmpeg_sp, last_stderr))
+                stderr_thread.start()
+
                 while True:
                     chunk = ffmpeg_sp.stdout.read(1024)
+
                     if len(chunk) == 0:
-                        stderr_output = ffmpeg_sp.stderr.read().decode("utf-8")
-                        if "I/O error" in stderr_output:
-                            logger.info("Stream to peer ({}) closed by server of Portal ({}). Mac address might be over-allocated.".format(ip, portalName))
-                            logger.info("Moving MAC({}) for Portal({})".format(mac, portalName))
-                            moveMac(portalId, mac)
-                        else:
-                            logger.info("Stream of ffmpeg process stopped with unknown error:\n{}".format(stderr_output))
-                        # check if ffmpeg process has closed
-                        if ffmpeg_sp.poll() != 0:
-                            logger.info("Ffmpeg process closed enexpectedly with return / error code ({}).".format(str(ffmpeg_sp.poll())))
-                        break
+                        logger.debug("No streaming data from ffmpeg.")
+                        if ffmpeg_sp.poll() is not None:
+                            logger.info("Ffmpeg process closed unexpectedly with return / error code ({}).".format(str(ffmpeg_sp.poll())))
+                            # Check errors
+                            error_text = "\n".join(last_stderr)
+                            if "I/O error" in error_text:
+                                logger.info("Stream to peer ({}) closed by server of Portal ({}).".format(ip, portalName))
+                                # calc streaming duration
+                                streamDuration = datetime.now(timezone.utc).timestamp() - startTime 
+                                if streamDuration < 120:
+                                    logger.info("Server closed connection after a short streaming period, which indicates that Mac address might be over-allocated.")
+                                    logger.info("Moving MAC({}) for Portal({})".format(mac, portalName))
+                                    moveMac(portalId, mac)
+                            elif "Operation timed out" in error_text:
+                                logger.info("Connection to server of Portal ({}) timed out.".format(portalName))
+                            else:
+                                logger.debug("Stream of ffmpeg process stopped with unknown error:\n{}".format(error_text))
+                            # stop streaming
+                            break
                     yield chunk
-        except:
+                
+        except GeneratorExit:
+            logger.info('Stream closed by client.')
+            pass
+        except Exception as e:
             pass
         finally:
             unoccupy()
+            stderr_thread.join()  # Wait for the end of the stderr thread
             ffmpeg_sp.kill()
 
     def testStream():
@@ -913,7 +966,7 @@ def channel(portalId, channelId):
                     if proxy:
                         ffmpegcmd.insert(1, "-http_proxy")
                         ffmpegcmd.insert(2, proxy)
-                    return Response(streamData(), mimetype="application/octet-stream")
+                    return Response(stream_with_context(streamData()), mimetype="application/octet-stream")
 
                 else:
                     if getSettings().get("stream method", "ffmpeg") == "ffmpeg":
@@ -930,7 +983,7 @@ def channel(portalId, channelId):
                         " ".join(ffmpegcmd.split())  # cleans up multiple whitespaces
                         ffmpegcmd = ffmpegcmd.split()
                         return Response(
-                            streamData(), mimetype="application/octet-stream"
+                            stream_with_context(streamData()), mimetype="application/octet-stream"
                         )
                     else:
                         logger.info("Redirect sent")
@@ -1040,7 +1093,7 @@ def channel(portalId, channelId):
                                                         )  # cleans up multiple whitespaces
                                                         ffmpegcmd = ffmpegcmd.split()
                                                         return Response(
-                                                            streamData(),
+                                                            stream_with_context(streamData()),
                                                             mimetype="application/octet-stream",
                                                         )
                                                     else:
@@ -1199,7 +1252,10 @@ if __name__ == "__main__":
     config = loadConfig()
     if debug:
         # If DEBUG is active, use default flask development sever in debug mode
+        logger.info("ATTENTION: Server started in debug mode. Don't use on productive systems!")
+        # Flask server in debug mode can lead to errors in vscode debugger
         app.run(host="0.0.0.0", port=8001, debug=debug)
+        #app.run(host="0.0.0.0", port=8001, debug=False)
     else:
         # On release use waitress server with multi-threading
         waitress.serve(app, port=8001, _quiet=True, threads=24)
