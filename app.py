@@ -17,7 +17,9 @@ from flask import (
     flash,
     stream_with_context
 )
+import math
 import time
+import requests
 from datetime import datetime, timezone
 from functools import wraps
 import secrets
@@ -68,7 +70,7 @@ d_ffmpegcmd = "ffmpeg -re -http_proxy <proxy> -timeout <timeout> -i <url> -map 0
 defaultSettings = {
     "stream method": "ffmpeg",
     "ffmpeg command": "ffmpeg -re -http_proxy <proxy> -timeout <timeout> -i <url> -map 0 -codec copy -f mpegts pipe:",
-    "ffmpeg timeout": "5",
+    "stream timeout": "5",
     "test streams": "true",
     "try all macs": "false",
     "use channel genres": "true",
@@ -101,6 +103,9 @@ defaultPortal = {
     "fallback channels": {},
 }
 
+
+maxWaitTimeFree = 5  # Time to wait for freed mac
+bufferSize = 1024  # Buffer size in bytes (1024=1kB)
 
 def loadConfig():
     try:
@@ -190,6 +195,7 @@ def authorise(f):
 
 def moveMac(portalId, mac):
     portals = getPortals()
+    logger.info("Moving MAC({}) for Portal({})".format(mac, portals[portalId]["name"]))
     macs = portals[portalId]["macs"]
     x = macs[mac]
     del macs[mac]
@@ -777,7 +783,43 @@ def xmltv():
 
 @app.route("/play/<portalId>/<channelId>", methods=["GET"])
 def channel(portalId, channelId):
+    def genFfmpegCmd():
+        if web:
+            ffmpegcmd = [
+                "ffmpeg",
+                "-loglevel",
+                "panic",
+                "-hide_banner",
+                "-i",
+                link,
+                "-vcodec",
+                "copy",
+                "-f",
+                "mp4",
+                "-movflags",
+                "frag_keyframe+empty_moov",
+                "pipe:",
+            ]
+            if proxy:
+                ffmpegcmd.insert(1, "-http_proxy")
+                ffmpegcmd.insert(2, proxy)
+        else:
+            ffmpegcmd = str(getSettings()["ffmpeg command"])
+            ffmpegcmd = ffmpegcmd.replace("<url>", link)
+            ffmpegcmd = ffmpegcmd.replace(
+                "<timeout>",
+                str(int(getSettings()["stream timeout"]) * int(1000000)),
+            )
+            if proxy:
+                ffmpegcmd = ffmpegcmd.replace("<proxy>", proxy)
+            else:
+                ffmpegcmd = ffmpegcmd.replace("-http_proxy <proxy>", "")
+            " ".join(ffmpegcmd.split())  # cleans up multiple whitespaces
+            ffmpegcmd = ffmpegcmd.split()
+        return ffmpegcmd
+
     def streamData():
+        
         def occupy():
             occupied.setdefault(portalId, [])
             occupied.get(portalId, []).append(
@@ -805,56 +847,116 @@ def channel(portalId, channelId):
             )
             logger.info("Unoccupied Portal({}):MAC({})".format(portalId, mac))
 
-        def read_stderr(ffmpeg_sp, last_stderr):
-            while True:
-                line = ffmpeg_sp.stderr.readline()
-                if not line:
-                    break
-                # Decode new line and keep latest 10 lines
-                stderr_text = line.decode('utf-8').strip()
-                logger.debug("FFMPEG stderr: " + stderr_text)
-                last_stderr.append(stderr_text)
-                if len(last_stderr) > 10: 
-                    last_stderr.pop(0) 
-                    
-        try:
+        def calcStreamDuration():
+            # calc streaming duration
+            streamDuration = datetime.now(timezone.utc).timestamp() - startTime 
+            return streamDuration
+
+        def startffmpeg():
+            def read_stderr(ffmpeg_sp, last_stderr):
+                while ffmpeg_sp.poll() is None:
+                    try:
+                        line = ffmpeg_sp.stderr.readline()
+                    except Exception as e:
+                        break
+                    if not line:
+                        break
+                    # Decode new line and keep latest 10 lines
+                    stderr_text = line.decode('utf-8').strip()
+                    logger.debug("FFMPEG stderr: " + stderr_text)
+                    last_stderr.append(stderr_text)
+                    if len(last_stderr) > 10: 
+                        last_stderr.pop(0) 
+                        
             last_stderr = [] # list to save the last stderr output
-            startTime = datetime.now(timezone.utc).timestamp()
-            occupy()
-            with subprocess.Popen(
-                ffmpegcmd,
-                stdin=subprocess.DEVNULL,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-            ) as ffmpeg_sp:
-                stderr_thread = threading.Thread(target=read_stderr, args=(ffmpeg_sp, last_stderr))
-                stderr_thread.start()
+            try:
+                with subprocess.Popen(
+                    ffmpegcmd,
+                    stdin=subprocess.DEVNULL,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                ) as ffmpeg_sp:
+                    # Start reading stderr of ffmpeg in seperate thread
+                    stderr_thread = threading.Thread(target=read_stderr, args=(ffmpeg_sp, last_stderr))
+                    stderr_thread.start()
 
-                while True:
-                    chunk = ffmpeg_sp.stdout.read(1024)
+                    while True:
+                        # read ffmpeg stdout buffer
+                        chunk = ffmpeg_sp.stdout.read(bufferSize)
 
-                    if len(chunk) == 0:
-                        logger.debug("No streaming data from ffmpeg.")
-                        if ffmpeg_sp.poll() is not None:
-                            logger.info("Ffmpeg process closed unexpectedly with return / error code ({}).".format(str(ffmpeg_sp.poll())))
-                            # Check errors
-                            error_text = "\n".join(last_stderr)
-                            if "I/O error" in error_text:
-                                logger.info("Stream to peer ({}) closed by server of Portal ({}).".format(ip, portalName))
-                                # calc streaming duration
-                                streamDuration = datetime.now(timezone.utc).timestamp() - startTime 
-                                if streamDuration < 120:
-                                    logger.info("Server closed connection after a short streaming period, which indicates that Mac address might be over-allocated.")
-                                    logger.info("Moving MAC({}) for Portal({})".format(mac, portalName))
-                                    moveMac(portalId, mac)
-                            elif "Operation timed out" in error_text:
-                                logger.info("Connection to server of Portal ({}) timed out.".format(portalName))
-                            else:
-                                logger.debug("Stream of ffmpeg process stopped with unknown error:\n{}".format(error_text))
-                            # stop streaming
-                            break
-                    yield chunk
+                        if len(chunk) == 0:
+                            logger.debug("No streaming data from ffmpeg detected.")
+                            if ffmpeg_sp.poll() is not None:
+                                logger.debug("Ffmpeg process closed unexpectedly with return / error code ({}).".format(str(ffmpeg_sp.poll())))
+                                # Check errors
+                                error_text = "\n".join(last_stderr)
+                                if "I/O error" in error_text:
+                                    logger.info("Stream to client ({}) from Portal ({}) was closed.".format(ip, portalName))
+                                    # Check mac over-allocation
+                                    if calcStreamDuration() < 120:
+                                        logger.info("A forced disconnection by the server after a short streaming time indicates that mac address might be over-used.")
+                                        moveMac(portalId, mac)
+                                elif "Operation timed out" in error_text:
+                                    logger.info("Stream to client ({}) from Portal ({}) timed out.".format(ip, portalName))
+                                else:
+                                    logger.debug("Stream with ffmpeg process stopped with unknown error:\n{}".format(error_text))
+                                # stop streaming
+                                break
+                        yield chunk
+            except Exception as e:
+                pass
+            finally:
+                if stderr_thread.is_alive():
+                    stderr_thread.join(timeout=0.2)  # Wait for the end of the stderr thread
+                ffmpeg_sp.kill()
                 
+        def startdirectbuffer():
+            reqTimeout = int(getSettings()["stream timeout"]) # Request timeout in seconds
+            try:
+                # Send a request to the source video stream URL
+                response = requests.get(link, stream=True, timeout=reqTimeout)
+                #response.raise_for_status() # Throws exception in case of HTTP error
+
+                # Check if the request was successful
+                if response.status_code == 200:
+                    # Start Streaming
+                    for chunk in response.iter_content(chunk_size=bufferSize):
+                        if len(chunk) == 0:
+                            logger.info("No streaming data.")
+                            return
+                        yield chunk
+                else:
+                    logger.error("Couldn't connect to stream URL ({}).\n Request stopped with status code ({}).".format(link, response.status_code))
+            except requests.exceptions.Timeout:
+                logger.error("Stream request to URL ({}) timed out.".format(link))
+            except requests.exceptions.RequestException as e:
+                logger.error("Stream request to URL ({}) ended with error:\n{}".format(link, e))
+            except Exception as e:
+                logger.error("Stream from direct buffer raised an unknown error:\n{}".format(e))
+                
+            # stream ended / closed by server
+            logger.info("Stream to client ({}) from Portal ({}) was closed.".format(ip, portalName))
+            if calcStreamDuration() < 120:
+                logger.info("A forced disconnection by the server after a short streaming time indicates that mac address might be over-used.")
+                moveMac(portalId, mac)
+            
+        # Start new stream
+        startTime = datetime.now(timezone.utc).timestamp()
+        try:
+            occupy()
+            if web or getSettings().get("stream method", "ffmpeg") == "ffmpeg":
+                # Generate specific ffmpeg command
+                ffmpegcmd = genFfmpegCmd()
+                
+                logger.debug("Start Stream by ffmpeg.")
+                for chunk in startffmpeg():
+                    yield chunk
+            elif getSettings().get("stream method", "buffer") == "buffer":
+                logger.debug("Start Stream by direct buffer.")
+                for chunk in startdirectbuffer():
+                    yield chunk
+            else:
+                logger.error("Unknown streaming method.")
         except GeneratorExit:
             logger.info('Stream closed by client.')
             pass
@@ -862,11 +964,9 @@ def channel(portalId, channelId):
             pass
         finally:
             unoccupy()
-            stderr_thread.join()  # Wait for the end of the stderr thread
-            ffmpeg_sp.kill()
 
     def testStream():
-        timeout = int(getSettings()["ffmpeg timeout"]) * int(1000000)
+        timeout = int(getSettings()["stream timeout"]) * int(1000000)
         ffprobecmd = ["ffprobe", "-timeout", str(timeout), "-i", link]
 
         if proxy:
@@ -886,8 +986,10 @@ def channel(portalId, channelId):
                 return False
 
     def isMacFree():
-        # when zapping, it takes a while until the stream and with it the mac is released again. 
-        for _ in range(50):  # Wait max 5 s
+        # When changing channels, it takes a while until the stream is finished and the Mac address gets released    
+        checkInterval=0.1
+        maxIterations = max(math.ceil(maxWaitTimeFree/checkInterval),1)
+        for _ in range(maxIterations):
             count = 0
             for i in occupied.get(portalId, []):
                 if i["mac"] == mac:
@@ -912,7 +1014,6 @@ def channel(portalId, channelId):
     )
 
     freeMac = False
-
     for mac in macs:
         channels = None
         cmd = None
@@ -947,41 +1048,7 @@ def channel(portalId, channelId):
 
         if link:
             if getSettings().get("test streams", "true") == "false" or testStream():
-                if web:
-                    ffmpegcmd = [
-                        "ffmpeg",
-                        "-loglevel",
-                        "panic",
-                        "-hide_banner",
-                        "-i",
-                        link,
-                        "-vcodec",
-                        "copy",
-                        "-f",
-                        "mp4",
-                        "-movflags",
-                        "frag_keyframe+empty_moov",
-                        "pipe:",
-                    ]
-                    if proxy:
-                        ffmpegcmd.insert(1, "-http_proxy")
-                        ffmpegcmd.insert(2, proxy)
-                    return Response(stream_with_context(streamData()), mimetype="application/octet-stream")
-
-                else:
-                    if getSettings().get("stream method", "ffmpeg") == "ffmpeg":
-                        ffmpegcmd = str(getSettings()["ffmpeg command"])
-                        ffmpegcmd = ffmpegcmd.replace("<url>", link)
-                        ffmpegcmd = ffmpegcmd.replace(
-                            "<timeout>",
-                            str(int(getSettings()["ffmpeg timeout"]) * int(1000000)),
-                        )
-                        if proxy:
-                            ffmpegcmd = ffmpegcmd.replace("<proxy>", proxy)
-                        else:
-                            ffmpegcmd = ffmpegcmd.replace("-http_proxy <proxy>", "")
-                        " ".join(ffmpegcmd.split())  # cleans up multiple whitespaces
-                        ffmpegcmd = ffmpegcmd.split()
+                    if getSettings().get("stream method", "ffmpeg") != "redirect":
                         return Response(
                             stream_with_context(streamData()), mimetype="application/octet-stream"
                         )
@@ -992,12 +1059,13 @@ def channel(portalId, channelId):
         logger.info(
             "Unable to connect to Portal({}) using MAC({})".format(portalId, mac)
         )
-        logger.info("Moving MAC({}) for Portal({})".format(mac, portalName))
+        # Try with next mac address
         moveMac(portalId, mac)
 
         if not getSettings().get("try all macs", "false") == "true":
             break
 
+    # Look for fallback 
     if not web:
         logger.info(
             "Portal({}):Channel({}) is not working. Looking for fallbacks...".format(
@@ -1028,9 +1096,7 @@ def channel(portalId, channelId):
                                         )
                                     except:
                                         logger.info(
-                                            "Unable to connect to fallback Portal({}) using MAC({})".format(
-                                                portalId, mac
-                                            )
+                                            "Unable to connect to fallback Portal({}) using MAC({})".format(portalId, mac)
                                         )
                                     if channels:
                                         fChannelId = k
@@ -1040,58 +1106,15 @@ def channel(portalId, channelId):
                                                 break
                                         if cmd:
                                             if "http://localhost/" in cmd:
-                                                link = stb.getLink(
-                                                    url, mac, token, cmd, proxy
-                                                )
+                                                link = stb.getLink(url, mac, token, cmd, proxy)
                                             else:
                                                 link = cmd.split(" ")[1]
                                             if link:
                                                 if testStream():
                                                     logger.info(
-                                                        "Fallback found for Portal({}):Channel({})".format(
-                                                            portalId, channelId
-                                                        )
+                                                        "Fallback found for Portal({}):Channel({})".format(portalId, channelId)
                                                     )
-                                                    if (
-                                                        getSettings().get(
-                                                            "stream method", "ffmpeg"
-                                                        )
-                                                        == "ffmpeg"
-                                                    ):
-                                                        ffmpegcmd = str(
-                                                            getSettings()[
-                                                                "ffmpeg command"
-                                                            ]
-                                                        )
-                                                        ffmpegcmd = ffmpegcmd.replace(
-                                                            "<url>", link
-                                                        )
-                                                        ffmpegcmd = ffmpegcmd.replace(
-                                                            "<timeout>",
-                                                            str(
-                                                                int(
-                                                                    getSettings()[
-                                                                        "ffmpeg timeout"
-                                                                    ]
-                                                                )
-                                                                * int(1000000)
-                                                            ),
-                                                        )
-                                                        if proxy:
-                                                            ffmpegcmd = (
-                                                                ffmpegcmd.replace(
-                                                                    "<proxy>", proxy
-                                                                )
-                                                            )
-                                                        else:
-                                                            ffmpegcmd = ffmpegcmd.replace(
-                                                                "-http_proxy <proxy>",
-                                                                "",
-                                                            )
-                                                        " ".join(
-                                                            ffmpegcmd.split()
-                                                        )  # cleans up multiple whitespaces
-                                                        ffmpegcmd = ffmpegcmd.split()
+                                                    if getSettings().get("stream method", "ffmpeg") != "redirect":
                                                         return Response(
                                                             stream_with_context(streamData()),
                                                             mimetype="application/octet-stream",

@@ -21,6 +21,7 @@
             <select class="form-select" title="Streaming Method" form="save" id="stream method" name="stream method"
                 required>
                 <option {{ "selected" if settings['stream method']=="ffmpeg" }} value="ffmpeg">FFMpeg</option>
+                <option {{ "selected" if settings['stream method']=="buffer" }} value="buffer">Buffer</option>
                 <option {{ "selected" if settings['stream method']=="redirect" }} value="redirect">Redirect</option>
             </select>
         </div>
@@ -43,13 +44,13 @@
 
         <br><br>
 
-        <h6>FFMpeg Timeout:</h6>
+        <h6>Stream Timeout:</h6>
         <div class="col-md-2">
             <div class="input-group flex-nowrap">
-                <input form="save" type="number" name="ffmpeg timeout" id="ffmpeg timeout" class="form-control"
-                    value="{{ settings['ffmpeg timeout'] }}" required>
+                <input form="save" type="number" name="stream timeout" id="stream timeout" class="form-control"
+                    value="{{ settings['stream timeout'] }}" required>
                 <button class="btn btn-danger btn-block" title="Reset"><i class="fa fa-undo"
-                        onclick="resetDefault(this)" data-input="ffmpeg timeout" data-default="{{ defaultSettings['ffmpeg timeout'] }}"></i></button>
+                        onclick="resetDefault(this)" data-input="stream timeout" data-default="{{ defaultSettings['stream timeout'] }}"></i></button>
             </div>
         </div>
         <span class="text-muted">Seconds to wait for a stream before giving up.</span>
