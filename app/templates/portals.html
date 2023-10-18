@@ -31,15 +31,61 @@
                     {{ portals[portal].name }}
                 </div>
                 <div class="card-body">
-                    <table class="table table-sm mt-2">
-                        {% for key, value in portals[portal].macs.items() %}
-                        <tr>
-                            <td><span>{{key.upper()}}</span></td>
-                            <td><span>:</span></td>
-                            <td><span name="expiryString">{{value}}</span></td>
-
-                        </tr>
-                        {% endfor %}
+                    <table id="macTable" class="table table-sm mt-2">
+                        <thead>
+                            <tr>
+                                <th>MAC Address</th>
+                                <th>Expiry Date</th>
+                                <th>Playtime</th>
+                                <th>Error Rate</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for key, value in portals[portal].macs.items() %}
+                                <tr>
+                                    <td>{{ key }}</td>
+                                    <td id="data-expDate-{{ portals[portal].name }}-{{ loop.index }}"></td>
+                                    <td id="data-playtime-{{ portals[portal].name }}-{{ loop.index }}"></td>
+                                    <td id="data-error-rate-{{ portals[portal].name }}-{{ loop.index }}"></td>
+                                </tr>
+                                
+                                <script>
+                                    var dateVal = document.getElementById("data-expDate-{{ portals[portal].name }}-{{ loop.index }}");
+                                    var playtimeVal = document.getElementById("data-playtime-{{ portals[portal].name }}-{{ loop.index }}");
+                                    var errorRateVal = document.getElementById("data-error-rate-{{ portals[portal].name }}-{{ loop.index }}");
+                                    
+                                    var expiryTimestamp = {{ value.expiry | tojson }};
+                                    if (expiryTimestamp !== null) {
+                                        var date = new Date(expiryTimestamp * 1000);
+                                        var options = { year: 'numeric', month: '2-digit', day: '2-digit' };
+                                        var formattedDate = date.toLocaleDateString(undefined, options);
+                                        dateVal.innerHTML = formattedDate;
+                                    } else {
+                                        dateVal.innerHTML = "N/A";
+                                    }
+                                
+                                    var playtime = {{ value.stats.playtime | tojson }};
+                                    if (playtime !== null) {
+                                        var hours = Math.floor(playtime / 3600);
+                                        var minutes = Math.floor((playtime % 3600) / 60);
+                                        var seconds = Math.floor(playtime % 60);
+                                        var formattedPlaytime = hours.toString().padStart(2, '0') + ':' + minutes.toString().padStart(2, '0') + ':' + seconds.toString().padStart(2, '0');
+                                        playtimeVal.innerHTML = formattedPlaytime;
+                                    } else {
+                                        playtimeVal.innerHTML = "N/A";
+                                    }
+                                    
+                                    var errors = {{ value.stats.errors | tojson }};
+                                    var requests = {{ value.stats.requests | tojson }};
+                                    if (errors !== null && requests !== null && requests !== 0) {
+                                        var errorRate = (errors / requests * 100).toFixed(2);
+                                        errorRateVal.innerHTML = errorRate + "%";
+                                    } else {
+                                        errorRateVal.innerHTML = "N/A";
+                                    }
+                                </script>
+                            {% endfor %}                      
+                        </tbody>
                     </table>
                 </div>
             </div>
@@ -198,8 +244,9 @@
 <script>
 
     var now = Date.now();
-    var expiries = document.getElementsByName("expiryString");
-    for (i in expiries) {
+    var expiries = document.querySelectorAll('[id^="data-expDate-"]');
+    
+    expiries.forEach(function(expiryElement) {
         var expires = Date.parse(expiries[i].innerText);
         var diff = expires - now;
         var daysAway = diff / (1000 * 3600 * 24);

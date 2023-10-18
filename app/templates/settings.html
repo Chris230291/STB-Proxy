@@ -25,7 +25,7 @@
                 <option {{ "selected" if settings['stream method']=="redirect" }} value="redirect">Redirect</option>
             </select>
         </div>
-        <span class="text-muted">FFMpeg is required to keep track of accounts and ensure only x users per MAC.</span>
+        <span class="text-muted">With Redirect option it is not possible to keep track of accounts and ensure only x streams per MAC.</span>
 
         <br><br>
 
@@ -64,6 +64,16 @@
             </div>
         </div>
         <span class="text-muted">This is required for the fallback system to work.</span>
+
+        <br><br>
+
+        <h6>Check MAC expiration:</h6>
+        <div class="col-md-2">
+            <div class="form-check form-switch">
+                <input form="save" type="checkbox" class="checkbox form-check-input" name="check expiration" value="true" {{ "checked" if settings['check expiration']=='true' }}>
+            </div>
+        </div>
+        <span class="text-muted">Check expiration date of mac adresses.</span>
 
         <br><br>
 

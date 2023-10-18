@@ -5,6 +5,7 @@ FROM alpine:latest AS base
 
 ENV HOST=localhost
 ENV CONFIG=/config/config.json
+ENV FLASK_ENV="docker"
 
 # Install required system packages
 RUN apk add \
@@ -19,10 +20,7 @@ RUN pip3 install \
 	waitress
 
 # Copy app files
-COPY /app.py /app/app.py
-COPY /stb.py /app/stb.py
-COPY /templates /app/templates
-COPY /static /app/static
+COPY /app /app
 
 WORKDIR /app
 

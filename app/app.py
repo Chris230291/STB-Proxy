@@ -24,6 +24,8 @@ from datetime import datetime, timezone
 from functools import wraps
 import secrets
 import waitress
+from collections import defaultdict
+import copy
 
 app = Flask(__name__)
 app.secret_key = secrets.token_urlsafe(32)
@@ -52,12 +54,12 @@ else:
     
 if os.getenv("DEBUG_MODE"):
     debug_str = os.getenv("DEBUG_MODE")
-    debug = debug_str.lower() == 'true' or debug_str == '1'
+    debugMode = debug_str.lower() == 'true' or debug_str == '1'
 else:
-    debug = False
+    debugMode = False
 
 # Set log level
-if debug:
+if debugMode:
     logger.setLevel(logging.DEBUG)
 else:
     logger.setLevel(logging.INFO)
@@ -87,11 +89,14 @@ defaultSettings = {
     "hdhr tuners": "1",
 }
 
+# Definition for default mac entry
+default_mac_info = {"expiry": None, "stats": {"playtime": 0, "errors": 0, "requests": 0}}
+
 defaultPortal = {
     "enabled": "true",
     "name": "",
     "url": "",
-    "macs": {},
+    "macs": defaultdict(lambda: default_mac_info),
     "streams per mac": "1",
     "epgTimeOffset": "0",
     "proxy": "",
@@ -108,10 +113,40 @@ maxWaitTimeFree = 5  # Time to wait for freed mac
 bufferSize = 1024  # Buffer size in bytes (1024=1kB)
 
 def loadConfig():
+    
+    def check_and_convert_macs(data):
+        macs_data = defaultdict(lambda: copy.deepcopy(default_mac_info))
+        
+        def update_values(default_dict, data_dict):
+            for key, value in default_dict.items():
+                if isinstance(value, dict):
+                    if key in data_dict and isinstance(data_dict[key], dict):
+                        update_values(default_dict[key], data_dict[key])
+                else:
+                    if key in data_dict:
+                        default_dict[key] = data_dict[key]
+        
+        for mac, mac_data in data.items():
+            if not isinstance(mac_data, dict):
+                # Das Format passt nicht, konvertiere es
+                newdict = copy.deepcopy(default_mac_info)
+                if isinstance(mac_data, str):
+                    timestamp = parseExpieryStr(mac_data)
+                    newdict["expiry"] = timestamp
+                elif isinstance(mac_data, (int, float)):
+                    newdict["expiry"] = mac_data
+                else:
+                    logger.error("Unable to get expiry date for MAC ({}) from old config data.".format(mac))
+                macs_data[mac] = newdict
+            else:
+                update_values(macs_data[mac], mac_data)
+        
+        return macs_data
+
     try:
         with open(configFile) as f:
             data = json.load(f)
-    except:
+    except FileNotFoundError:
         logger.warning("No existing config found. Creating a new one")
         data = {}
 
@@ -121,10 +156,10 @@ def loadConfig():
     settings = data["settings"]
     settingsOut = {}
 
-    for setting, default in defaultSettings.items():
+    for setting, defaultData in defaultSettings.items():
         value = settings.get(setting)
-        if not value or type(default) != type(value):
-            value = default
+        if not value or type(defaultData) != type(value):
+            value = copy.copy(defaultData)
         settingsOut[setting] = value
 
     data["settings"] = settingsOut
@@ -132,20 +167,52 @@ def loadConfig():
     portals = data["portals"]
     portalsOut = {}
 
-    for portal in portals:
-        portalsOut[portal] = {}
-        for setting, default in defaultPortal.items():
-            value = portals[portal].get(setting)
-            if not value or type(default) != type(value):
-                value = default
-            portalsOut[portal][setting] = value
+    for portal, loadedData in portals.items():
+        mergedPortalData = {}
+        for setting, defaultData in defaultPortal.items():
+            value = loadedData.get(setting)
+            if setting == "macs":
+                value = check_and_convert_macs(value)
+            if not value or type(defaultData) != type(value):
+                value = copy.copy(defaultData)
+            mergedPortalData[setting] = value
+        portalsOut[portal] = mergedPortalData
 
     data["portals"] = portalsOut
 
-    with open(configFile, "w") as f:
-        json.dump(data, f, indent=4)
-
     return data
+
+def parseExpieryStr(date_string):
+    try:
+        # Try to parse the date string
+        date_obj = datetime.strptime(date_string, "%B %d, %Y, %I:%M %p")
+        # Convert the datetime object to a Unix timestamp
+        timestamp = date_obj.timestamp()
+        return timestamp
+    except ValueError:
+        logger.info("Unable to parse expiration date ({})".format(date_string))
+        return None
+
+def checkExpiration(expieryStr):
+    def timeLeft(timestamp):
+        try:
+            # Calculate the time difference in seconds
+            current_time = datetime.now().timestamp()
+            difference = current_time - timestamp
+            return difference
+        except Exception as e:
+            return None
+    
+    expTimestamp = parseExpieryStr(expieryStr)
+    timeLeft = timeLeft(expTimestamp)
+    
+    if timeLeft > 0:
+        daysLeft = math.floor(timeLeft / (60 * 60 * 24))
+        return False, daysLeft
+    else:
+        return True, 0
+        
+
 
 
 def getPortals():
@@ -238,12 +305,14 @@ def portalsAdd():
     macsd = {}
 
     for mac in macs:
+        macTestSuccess = False
         token = stb.getToken(url, mac, proxy)
         if token:
             stb.getProfile(url, mac, token, proxy)
             expiry = stb.getExpires(url, mac, token, proxy)
             if expiry:
-                macsd[mac] = expiry
+                macTestSuccess = True
+                macsd[mac] = parseExpieryStr(expiry)
                 logger.info(
                     "Successfully tested MAC({}) for Portal({})".format(mac, name)
                 )
@@ -252,9 +321,9 @@ def portalsAdd():
                     "success",
                 )
                 continue
-
-        logger.error("Error testing MAC({}) for Portal({})".format(mac, name))
-        flash("Error testing MAC({}) for Portal({})".format(mac, name), "danger")
+        if not macTestSuccess:
+            logger.error("Error testing MAC({}) for Portal({})".format(mac, name))
+            flash("Error testing MAC({}) for Portal({})".format(mac, name), "danger")
 
     if len(macsd) > 0:
         portal = {
@@ -317,8 +386,9 @@ def portalUpdate():
             if token:
                 stb.getProfile(url, mac, token, proxy)
                 expiry = stb.getExpires(url, mac, token, proxy)
+                
                 if expiry:
-                    macsout[mac] = expiry
+                    macsout[mac] = parseExpieryStr(expiry)
                     logger.info(
                         "Successfully tested MAC({}) for Portal({})".format(mac, name)
                     )
@@ -891,11 +961,9 @@ def channel(portalId, channelId):
                                 # Check errors
                                 error_text = "\n".join(last_stderr)
                                 if "I/O error" in error_text:
+                                    # stream ended / closed by server
+                                    streamCanceled = True
                                     logger.info("Stream to client ({}) from Portal ({}) was closed.".format(ip, portalName))
-                                    # Check mac over-allocation
-                                    if calcStreamDuration() < 120:
-                                        logger.info("A forced disconnection by the server after a short streaming time indicates that mac address might be over-used.")
-                                        moveMac(portalId, mac)
                                 elif "Operation timed out" in error_text:
                                     logger.info("Stream to client ({}) from Portal ({}) timed out.".format(ip, portalName))
                                 else:
@@ -905,17 +973,16 @@ def channel(portalId, channelId):
                         yield chunk
             except Exception as e:
                 pass
-            finally:
+            finally:              
                 if stderr_thread.is_alive():
                     stderr_thread.join(timeout=0.2)  # Wait for the end of the stderr thread
                 ffmpeg_sp.kill()
                 
         def startdirectbuffer():
-            reqTimeout = int(getSettings()["stream timeout"]) # Request timeout in seconds
             try:
                 # Send a request to the source video stream URL
+                reqTimeout = int(getSettings()["stream timeout"]) # Request timeout in seconds
                 response = requests.get(link, stream=True, timeout=reqTimeout)
-                #response.raise_for_status() # Throws exception in case of HTTP error
 
                 # Check if the request was successful
                 if response.status_code == 200:
@@ -929,19 +996,21 @@ def channel(portalId, channelId):
                     logger.error("Couldn't connect to stream URL ({}).\n Request stopped with status code ({}).".format(link, response.status_code))
             except requests.exceptions.Timeout:
                 logger.error("Stream request to URL ({}) timed out.".format(link))
+                return
             except requests.exceptions.RequestException as e:
                 logger.error("Stream request to URL ({}) ended with error:\n{}".format(link, e))
+                return
             except Exception as e:
                 logger.error("Stream from direct buffer raised an unknown error:\n{}".format(e))
+                return
                 
             # stream ended / closed by server
+            streamCanceled = True
             logger.info("Stream to client ({}) from Portal ({}) was closed.".format(ip, portalName))
-            if calcStreamDuration() < 120:
-                logger.info("A forced disconnection by the server after a short streaming time indicates that mac address might be over-used.")
-                moveMac(portalId, mac)
             
         # Start new stream
         startTime = datetime.now(timezone.utc).timestamp()
+        streamCanceled = False
         try:
             occupy()
             if web or getSettings().get("stream method", "ffmpeg") == "ffmpeg":
@@ -964,6 +1033,15 @@ def channel(portalId, channelId):
             pass
         finally:
             unoccupy()
+            streamDuration = round(calcStreamDuration(), 1)
+            # update statistics
+            portal["macs"][mac]["stats"]["playtime"] += streamDuration
+            portal["macs"][mac]["stats"]["errors"] += streamCanceled
+            # move Mac if stream was canceled by server after a short streaming period (over-usage indication)
+            if streamCanceled and streamDuration < 120:
+                logger.info("A forced disconnection by the server after a short streaming time indicates that mac address might be over-used.")
+                moveMac(portalId, mac)
+            savePortals(portals)
 
     def testStream():
         timeout = int(getSettings()["stream timeout"]) * int(1000000)
@@ -1000,14 +1078,19 @@ def channel(portalId, channelId):
                 time.sleep(0.1)
         return False 
 
-    portal = getPortals().get(portalId)
+    # client info from request
+    web = request.args.get("web")
+    ip = request.remote_addr
+
+    # Portal data
+    portals = getPortals()
+    portal = portals.get(portalId)
+    
     portalName = portal.get("name")
     url = portal.get("url")
     macs = list(portal["macs"].keys())
     streamsPerMac = int(portal.get("streams per mac"))
     proxy = portal.get("proxy")
-    web = request.args.get("web")
-    ip = request.remote_addr
 
     logger.info(
         "IP({}) requested Portal({}):Channel({})".format(ip, portalId, channelId)
@@ -1048,6 +1131,8 @@ def channel(portalId, channelId):
 
         if link:
             if getSettings().get("test streams", "true") == "false" or testStream():
+                    portal["macs"][mac]["stats"]["requests"] += 1
+                    savePortals(portals)
                     if getSettings().get("stream method", "ffmpeg") != "redirect":
                         return Response(
                             stream_with_context(streamData()), mimetype="application/octet-stream"
@@ -1055,7 +1140,6 @@ def channel(portalId, channelId):
                     else:
                         logger.info("Redirect sent")
                         return redirect(link)
-
         logger.info(
             "Unable to connect to Portal({}) using MAC({})".format(portalId, mac)
         )
@@ -1073,11 +1157,11 @@ def channel(portalId, channelId):
             )
         )
 
-        portals = getPortals()
         for portal in portals:
             if portals[portal]["enabled"] == "true":
                 fallbackChannels = portals[portal]["fallback channels"]
                 if channelName in fallbackChannels.values():
+                    
                     url = portals[portal].get("url")
                     macs = list(portals[portal]["macs"].keys())
                     proxy = portals[portal].get("proxy")
@@ -1114,6 +1198,8 @@ def channel(portalId, channelId):
                                                     logger.info(
                                                         "Fallback found for Portal({}):Channel({})".format(portalId, channelId)
                                                     )
+                                                    portal["macs"][mac]["stats"]["requests"] += 1
+                                                    savePortals(portals)
                                                     if getSettings().get("stream method", "ffmpeg") != "redirect":
                                                         return Response(
                                                             stream_with_context(streamData()),
@@ -1273,12 +1359,12 @@ def lineup():
 
 if __name__ == "__main__":
     config = loadConfig()
-    if debug:
+    if debugMode:
         # If DEBUG is active, use default flask development sever in debug mode
         logger.info("ATTENTION: Server started in debug mode. Don't use on productive systems!")
         # Flask server in debug mode can lead to errors in vscode debugger
-        app.run(host="0.0.0.0", port=8001, debug=debug)
-        #app.run(host="0.0.0.0", port=8001, debug=False)
+        #app.debug = debugMode
+        app.run(host="0.0.0.0", port=8001)
     else:
         # On release use waitress server with multi-threading
         waitress.serve(app, port=8001, _quiet=True, threads=24)
