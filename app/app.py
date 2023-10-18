@@ -212,9 +212,6 @@ def checkExpiration(expieryStr):
     else:
         return True, 0
         
-
-
-
 def getPortals():
     return config["portals"]
 
@@ -302,7 +299,7 @@ def portalsAdd():
             flash("Error getting URL for Portal({})".format(name), "danger")
             return redirect("/portals", code=302)
 
-    macsd = {}
+    macsd = defaultdict(lambda: copy.deepcopy(default_mac_info))
 
     for mac in macs:
         macTestSuccess = False
@@ -311,8 +308,8 @@ def portalsAdd():
             stb.getProfile(url, mac, token, proxy)
             expiry = stb.getExpires(url, mac, token, proxy)
             if expiry:
+                macsd[mac]["expiry"] = parseExpieryStr(expiry)
                 macTestSuccess = True
-                macsd[mac] = parseExpieryStr(expiry)
                 logger.info(
                     "Successfully tested MAC({}) for Portal({})".format(mac, name)
                 )
@@ -320,7 +317,6 @@ def portalsAdd():
                     "Successfully tested MAC({}) for Portal({})".format(mac, name),
                     "success",
                 )
-                continue
         if not macTestSuccess:
             logger.error("Error testing MAC({}) for Portal({})".format(mac, name))
             flash("Error testing MAC({}) for Portal({})".format(mac, name), "danger")
@@ -377,18 +373,20 @@ def portalUpdate():
 
     portals = getPortals()
     oldmacs = portals[id]["macs"]
-    macsout = {}
+    macsout = defaultdict(lambda: copy.deepcopy(default_mac_info))
     deadmacs = []
 
     for mac in newmacs:
+        # Check mac on retest or if it's new 
         if retest or mac not in oldmacs.keys():
+            macTestSuccess = False
             token = stb.getToken(url, mac, proxy)
             if token:
                 stb.getProfile(url, mac, token, proxy)
                 expiry = stb.getExpires(url, mac, token, proxy)
-                
                 if expiry:
-                    macsout[mac] = parseExpieryStr(expiry)
+                    macsout[mac]["expiry"] = parseExpieryStr(expiry)
+                    macTestSuccess = True
                     logger.info(
                         "Successfully tested MAC({}) for Portal({})".format(mac, name)
                     )
@@ -396,15 +394,23 @@ def portalUpdate():
                         "Successfully tested MAC({}) for Portal({})".format(mac, name),
                         "success",
                     )
+            if not macTestSuccess:
+                logger.error("Error testing MAC({}) for Portal({})".format(mac, name))
+                flash("Error testing MAC({}) for Portal({})".format(mac, name), "danger")
+                
+            # if check was unsuccessfull, add to list of dead macs
             if mac not in macsout.keys():
                 deadmacs.append(mac)
 
+        # keep oldmacs
         if mac in oldmacs.keys() and mac not in deadmacs:
-            macsout[mac] = oldmacs[mac]
-            continue
-
-        logger.error("Error testing MAC({}) for Portal({})".format(mac, name))
-        flash("Error testing MAC({}) for Portal({})".format(mac, name), "danger")
+            # if retested, update expiry date but keep statistics
+            if mac in macsout.keys():
+                updated_expiry = macsout[mac]["expiry"]
+                macsout[mac] = oldmacs[mac]
+                macsout[mac]["expiry"] = updated_expiry
+            else:
+                macsout[mac] = oldmacs[mac]
 
     if len(macsout) > 0:
         portals[id]["enabled"] = enabled
@@ -923,6 +929,7 @@ def channel(portalId, channelId):
             return streamDuration
 
         def startffmpeg():
+            nonlocal streamCanceled
             def read_stderr(ffmpeg_sp, last_stderr):
                 while ffmpeg_sp.poll() is None:
                     try:
@@ -937,7 +944,7 @@ def channel(portalId, channelId):
                     last_stderr.append(stderr_text)
                     if len(last_stderr) > 10: 
                         last_stderr.pop(0) 
-                        
+            
             last_stderr = [] # list to save the last stderr output
             try:
                 with subprocess.Popen(
@@ -979,6 +986,7 @@ def channel(portalId, channelId):
                 ffmpeg_sp.kill()
                 
         def startdirectbuffer():
+            nonlocal streamCanceled
             try:
                 # Send a request to the source video stream URL
                 reqTimeout = int(getSettings()["stream timeout"]) # Request timeout in seconds

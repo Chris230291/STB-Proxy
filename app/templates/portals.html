@@ -246,8 +246,8 @@
     var now = Date.now();
     var expiries = document.querySelectorAll('[id^="data-expDate-"]');
     
-    expiries.forEach(function(expiryElement) {
-        var expires = Date.parse(expiries[i].innerText);
+    expiries.forEach(function(expiryElement, i) { // Hier wurde "i" hinzugefügt
+        var expires = Date.parse(expiryElement.innerText);
         var diff = expires - now;
         var daysAway = diff / (1000 * 3600 * 24);
         if (now > expires) {
@@ -255,8 +255,7 @@
         } else if (daysAway < 30) {
             expiries[i].parentElement.parentElement.classList.add("table-warning");
         }
-
-    }
+    });
 
     var editModal = document.getElementById('modalEdit');
     editModal.addEventListener('show.bs.modal', function (event) {
@@ -284,7 +283,7 @@
         document.getElementById('deleteId').value = id;
         document.getElementById('deleteName').value = name;
         document.getElementById('retest').checked = false;
-    })
+    });
 
     function retestSave() {
         document.getElementById('retest').checked = true;
