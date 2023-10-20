@@ -46,11 +46,6 @@ if os.getenv("CONFIG"):
 else:
     configFile = os.path.join(basePath, "config.json")
 
-if os.getenv("DEBUG"):
-    debug = bool(os.getenv("DEBUG"))
-else:
-    debug = True
-
 occupied = {}
 config = {}
 
