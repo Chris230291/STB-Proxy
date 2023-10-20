@@ -307,15 +307,16 @@ def portalUpdate():
                         "Successfully tested MAC({}) for Portal({})".format(mac, name),
                         "success",
                     )
-            if mac not in macsout.keys():
+
+            if mac not in list(macsout.keys()):
                 deadmacs.append(mac)
 
         if mac in oldmacs.keys() and mac not in deadmacs:
             macsout[mac] = oldmacs[mac]
-            continue
 
-        logger.error("Error testing MAC({}) for Portal({})".format(mac, name))
-        flash("Error testing MAC({}) for Portal({})".format(mac, name), "danger")
+        if mac not in macsout.keys():
+            logger.error("Error testing MAC({}) for Portal({})".format(mac, name))
+            flash("Error testing MAC({}) for Portal({})".format(mac, name), "danger")
 
     if len(macsout) > 0:
         portals[id]["enabled"] = enabled
@@ -1182,5 +1183,5 @@ def lineup():
 
 if __name__ == "__main__":
     config = loadConfig()
-    waitress.serve(app, port=8001, _quiet=True, threads=24)
-    # app.run(host="0.0.0.0", port=8001, debug=debug)
+    #waitress.serve(app, port=8001, _quiet=True, threads=24)
+    app.run(host="0.0.0.0", port=8001, debug=debug)
