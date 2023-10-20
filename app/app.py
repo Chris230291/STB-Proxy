@@ -21,6 +21,7 @@ import math
 import time
 import requests
 from datetime import datetime, timezone
+from dateutil.parser import parse
 from functools import wraps
 import secrets
 import waitress
@@ -128,7 +129,6 @@ def loadConfig():
         
         for mac, mac_data in data.items():
             if not isinstance(mac_data, dict):
-                # Das Format passt nicht, konvertiere es
                 newdict = copy.deepcopy(default_mac_info)
                 if isinstance(mac_data, str):
                     timestamp = parseExpieryStr(mac_data)
@@ -184,8 +184,9 @@ def loadConfig():
 
 def parseExpieryStr(date_string):
     try:
-        # Try to parse the date string
-        date_obj = datetime.strptime(date_string, "%B %d, %Y, %I:%M %p")
+        # We need dateutil, because the date format is not unique all portals
+        # date_obj = datetime.strptime(date_string, "%B %d, %Y, %I:%M %p")
+        date_obj = parse(date_string)
         # Convert the datetime object to a Unix timestamp
         timestamp = date_obj.timestamp()
         return timestamp
@@ -1046,7 +1047,7 @@ def channel(portalId, channelId):
             portal["macs"][mac]["stats"]["playtime"] += streamDuration
             portal["macs"][mac]["stats"]["errors"] += streamCanceled
             # move Mac if stream was canceled by server after a short streaming period (over-usage indication)
-            if streamCanceled and streamDuration < 120:
+            if streamCanceled and streamDuration <= 60:
                 logger.info("A forced disconnection by the server after a short streaming time indicates that mac address might be over-used.")
                 moveMac(portalId, mac)
             savePortals(portals)

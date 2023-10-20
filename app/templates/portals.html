@@ -56,10 +56,20 @@
                                     
                                     var expiryTimestamp = {{ value.expiry | tojson }};
                                     if (expiryTimestamp !== null) {
-                                        var date = new Date(expiryTimestamp * 1000);
-                                        var options = { year: 'numeric', month: '2-digit', day: '2-digit' };
-                                        var formattedDate = date.toLocaleDateString(undefined, options);
+                                        var now = Date.now();
+                                        var expires = expiryTimestamp * 1000;
+                                        var diff = expires - now;
+                                        var daysAway = diff / (1000 * 3600 * 24);
+
+                                        var dateFormat = { year: 'numeric', month: '2-digit', day: '2-digit' };
+                                        var formattedDate = new Date(expires).toLocaleDateString(undefined, dateFormat);
                                         dateVal.innerHTML = formattedDate;
+                        
+                                        if (now > expires) {
+                                            dateVal.parentElement.classList.add("table-danger");
+                                        } else if (daysAway < 30) {
+                                            dateVal.parentElement.classList.add("table-warning");
+                                        }
                                     } else {
                                         dateVal.innerHTML = "N/A";
                                     }
@@ -242,20 +252,6 @@
 </div>
 
 <script>
-
-    var now = Date.now();
-    var expiries = document.querySelectorAll('[id^="data-expDate-"]');
-    
-    expiries.forEach(function(expiryElement, i) { // Hier wurde "i" hinzugefügt
-        var expires = Date.parse(expiryElement.innerText);
-        var diff = expires - now;
-        var daysAway = diff / (1000 * 3600 * 24);
-        if (now > expires) {
-            expiries[i].parentElement.parentElement.classList.add("table-danger");
-        } else if (daysAway < 30) {
-            expiries[i].parentElement.parentElement.classList.add("table-warning");
-        }
-    });
 
     var editModal = document.getElementById('modalEdit');
     editModal.addEventListener('show.bs.modal', function (event) {
