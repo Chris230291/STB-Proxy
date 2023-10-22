@@ -30,14 +30,14 @@
                     <i class="me-2 fa fa-ban"{{ "hidden" if portals[portal].enabled =='true' }}></i>
                     {{ portals[portal].name }}
                 </div>
-                <div class="card-body">
+                <div class="card-body" style="font-size: 80%">
                     <table id="macTable" class="table table-sm mt-2">
                         <thead>
                             <tr>
                                 <th>MAC Address</th>
-                                <th>Expiry Date</th>
+                                <th>Expiry</th>
                                 <th>Playtime</th>
-                                <th>Error Rate</th>
+                                <th>Error</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -88,7 +88,7 @@
                                     var errors = {{ value.stats.errors | tojson }};
                                     var requests = {{ value.stats.requests | tojson }};
                                     if (errors !== null && requests !== null && requests !== 0) {
-                                        var errorRate = (errors / requests * 100).toFixed(2);
+                                        var errorRate = (errors / requests * 100).toFixed(0);
                                         errorRateVal.innerHTML = errorRate + "%";
                                     } else {
                                         errorRateVal.innerHTML = "N/A";
