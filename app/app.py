@@ -1368,12 +1368,12 @@ def lineup():
 
 if __name__ == "__main__":
     config = loadConfig()
-    if debugMode:
-        # If DEBUG is active, use default flask development sever in debug mode
+    if debugMode or ("TERM_PROGRAM" in os.environ.keys() and os.environ["TERM_PROGRAM"] == "vscode"):
+        # If DEBUG is active or code running In VS Code, use default flask development sever in debug mode
         logger.info("ATTENTION: Server started in debug mode. Don't use on productive systems!")
-        # Flask server in debug mode can lead to errors in vscode debugger
-        #app.debug = debugMode
-        app.run(host="0.0.0.0", port=8001)
+        app.run(host="0.0.0.0", port=8001, debug=True)
+        # Note: Flask server in debug mode can lead to errors in vscode debugger ([errno 98] address in use)
+        # app.run(host="0.0.0.0", port=8001, debug=False)
     else:
         # On release use waitress server with multi-threading
         waitress.serve(app, port=8001, _quiet=True, threads=24)
