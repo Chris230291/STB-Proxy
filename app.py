@@ -1,5 +1,6 @@
+# region import
 import flask
-import stb
+import threading
 import os
 import json
 import subprocess
@@ -14,17 +15,26 @@ from flask import (
     Response,
     make_response,
     flash,
+    stream_with_context,
 )
+import math
+import time
+import requests
 from datetime import datetime, timezone
+from dateutil.parser import parse
 from functools import wraps
 import secrets
 import waitress
+import copy
+import ast
 
+# endregion
+
+# region init
 app = Flask(__name__)
 app.secret_key = secrets.token_urlsafe(32)
 
 logger = logging.getLogger("STB-Proxy")
-logger.setLevel(logging.INFO)
 logFormat = logging.Formatter("%(asctime)s [%(levelname)s] %(message)s")
 fileHandler = logging.FileHandler("STB-Proxy.log")
 fileHandler.setFormatter(logFormat)
@@ -42,125 +52,175 @@ else:
     host = "localhost:8001"
 
 if os.getenv("CONFIG"):
-    configFile = os.getenv("CONFIG")
+    config_dir = os.getenv("CONFIG")
 else:
-    configFile = os.path.join(basePath, "config.json")
+    config_dir = basePath
 
+if os.getenv("DEBUG"):
+    debugString = os.getenv("DEBUG")
+    debug = debugString.lower() == "true" or debugString == "1"
+    logger.setLevel(logging.DEBUG)
+else:
+    debug = False
+    logger.setLevel(logging.INFO)
+
+settings_file = os.path.join(config_dir, "settings.json")
+sources_file = os.path.join(config_dir, "sources.json")
+
+settings = {}
+sources = {}
 occupied = {}
-config = {}
 
 d_ffmpegcmd = "ffmpeg -re -http_proxy <proxy> -timeout <timeout> -i <url> -map 0 -codec copy -f mpegts pipe:"
 
-defaultSettings = {
-    "stream method": "ffmpeg",
-    "ffmpeg command": "ffmpeg -re -http_proxy <proxy> -timeout <timeout> -i <url> -map 0 -codec copy -f mpegts pipe:",
-    "ffmpeg timeout": "5",
-    "test streams": "true",
-    "try all macs": "false",
-    "use channel genres": "true",
-    "use channel numbers": "true",
-    "sort playlist by channel genre": "false",
-    "sort playlist by channel number": "false",
-    "sort playlist by channel name": "false",
-    "enable security": "false",
+default_settings = {
+    "stream method": "direct buffer",
+    "stream timeout": 5,
+    "stream chunk size": 1024,
+    "ffmpeg command": "ffmpeg -http_proxy <proxy> -timeout <timeout> -i <url> -codec copy -f mpegts pipe:",
+    "test streams": False,
+    "use channel groups": True,
+    "use channel numbers": True,
+    "sort playlists by channel group": False,
+    "sort playlists by channel number": False,
+    "sort playlists by channel name": False,
+    "enable security": False,
     "username": "admin",
     "password": "12345",
-    "enable hdhr": "false",
+    "enable hdhr": False,
     "hdhr name": "STB-Proxy",
     "hdhr id": str(uuid.uuid4().hex),
-    "hdhr tuners": "1",
+    "hdhr tuners": 1,
 }
 
-defaultPortal = {
-    "enabled": "true",
+default_mac = {
+    "type": "mac",
+    "enabled": True,
     "name": "",
     "url": "",
     "macs": {},
-    "streams per mac": "1",
-    "proxy": "",
+    "epg time offset": 0,
+    "try all macs": False,
     "enabled channels": [],
     "custom channel names": {},
     "custom channel numbers": {},
-    "custom genres": {},
+    "custom groups": {},
     "custom epg ids": {},
     "fallback channels": {},
 }
 
+default_macs_dict = {
+    "mac": None,
+    "proxy": "",
+    "max streams": 1,
+    "expiry": None,
+    "playtime": 0,
+    "errors": 0,
+    "requests": 0,
+}
 
-def loadConfig():
+# endregion
+
+
+# region core functions
+def convert_configs():
+    config_file = os.path.join(config_dir, "config.json")
+    if os.path.exists(config_file):
+        with open(config_file) as config:
+            data = json.load(config)
+            with open(settings_file, "w") as settings:
+                json.dump(data["settings"], settings, indent=4)
+            with open(sources_file, "w") as sources:
+                for i in data["portals"]:
+                    data["portals"][i]["type"] = "mac"
+                json.dump(data["portals"], sources, indent=4)
+        os.remove(os.path.join(config_dir, "config.json"))
+
+
+def load_settings():
     try:
-        with open(configFile) as f:
+        with open(settings_file) as f:
             data = json.load(f)
     except:
-        logger.warning("No existing config found. Creating a new one")
+        logger.warning("No settings file found... Creating a new one")
         data = {}
 
-    data.setdefault("portals", {})
-    data.setdefault("settings", {})
+    data_out = {}
 
-    settings = data["settings"]
-    settingsOut = {}
-
-    for setting, default in defaultSettings.items():
-        value = settings.get(setting)
+    for setting, default in default_settings.items():
+        value = data.get(setting)
         if not value or type(default) != type(value):
             value = default
-        settingsOut[setting] = value
+        data_out[setting] = value
 
-    data["settings"] = settingsOut
+    with open(settings_file, "w") as f:
+        json.dump(data_out, f, indent=4)
 
-    portals = data["portals"]
-    portalsOut = {}
+    return data_out
 
-    for portal in portals:
-        portalsOut[portal] = {}
-        for setting, default in defaultPortal.items():
-            value = portals[portal].get(setting)
+
+def load_sources():
+    try:
+        with open(sources_file) as f:
+            data = json.load(f)
+    except:
+        logger.warning("No sources file found... Creating a new one")
+        data = {}
+
+    data_out = {}
+
+    for s in data:
+        data_out[s] = {}
+
+        if data[s]["type"] == "mac":
+            defaults = default_mac
+        elif data[s]["type"] == "xtream":
+            pass
+        elif data[s]["type"] == "m3u":
+            pass
+        else:
+            continue
+
+        for setting, default in defaults.items():
+            value = data[s].get(setting)
             if not value or type(default) != type(value):
                 value = default
-            portalsOut[portal][setting] = value
+            data_out[s][setting] = value
 
-    data["portals"] = portalsOut
+    with open(sources_file, "w") as f:
+        json.dump(data_out, f, indent=4)
 
-    with open(configFile, "w") as f:
-        json.dump(data, f, indent=4)
-
-    return data
+    return data_out
 
 
-def getPortals():
-    return config["portals"]
+def parse_expiery_string(date_string):
+    try:
+        date_obj = parse(date_string)
+        timestamp = date_obj.timestamp()
+        return int(timestamp)
+    except:
+        logger.info("Unable to parse expiration date ({})".format(date_string))
 
 
-def savePortals(portals):
-    with open(configFile, "w") as f:
-        config["portals"] = portals
-        json.dump(config, f, indent=4)
+def save_settings():
+    with open(settings_file, "w") as f:
+        json.dump(settings, f, indent=4)
 
 
-def getSettings():
-    return config["settings"]
-
-
-def saveSettings(settings):
-    with open(configFile, "w") as f:
-        config["settings"] = settings
-        json.dump(config, f, indent=4)
+def save_sources():
+    with open(sources_file, "w") as f:
+        json.dump(sources, f, indent=4)
 
 
 def authorise(f):
     @wraps(f)
     def decorated(*args, **kwargs):
         auth = request.authorization
-        settings = getSettings()
-        security = settings["enable security"]
-        username = settings["username"]
-        password = settings["password"]
         if (
-            security == "false"
+            settings["enable security"] == False
             or auth
-            and auth.username == username
-            and auth.password == password
+            and auth.username == settings["username"]
+            and auth.password == settings["password"]
         ):
             return f(*args, **kwargs)
 
@@ -173,128 +233,497 @@ def authorise(f):
     return decorated
 
 
-def moveMac(portalId, mac):
-    portals = getPortals()
-    macs = portals[portalId]["macs"]
-    x = macs[mac]
-    del macs[mac]
-    macs[mac] = x
-    portals[portalId]["macs"] = macs
-    savePortals(portals)
+def test_stream(link, proxy):
+    ffprobecmd = [
+        "ffprobe",
+        "-timeout",
+        str(settings["stream timeout"] * int(1000000)),
+        "-i",
+        link,
+    ]
+
+    if proxy:
+        ffprobecmd.insert(1, "-http_proxy")
+        ffprobecmd.insert(2, proxy)
+
+    with subprocess.Popen(
+        ffprobecmd,
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    ) as ffprobe_sb:
+        ffprobe_sb.communicate()
+        if ffprobe_sb.returncode == 0:
+            return True
+        else:
+            return False
 
 
-@app.route("/", methods=["GET"])
-@authorise
-def home():
-    return redirect("/portals", code=302)
+def stream_data(stream):
+    def build_ffmpeg_command(stream):
+        if stream["web"]:
+            ffmpegcmd = [
+                "ffmpeg",
+                "-loglevel",
+                "panic",
+                "-hide_banner",
+                "-i",
+                stream["link"],
+                "-vcodec",
+                "copy",
+                "-f",
+                "mp4",
+                "-movflags",
+                "frag_keyframe+empty_moov",
+                "pipe:",
+            ]
+            if stream["proxy"]:
+                ffmpegcmd.insert(1, "-http_proxy")
+                ffmpegcmd.insert(2, stream["proxy"])
+        else:
+            ffmpegcmd = settings["ffmpeg command"]
+            ffmpegcmd = ffmpegcmd.replace("<url>", stream["link"])
+            ffmpegcmd = ffmpegcmd.replace(
+                "<timeout>",
+                str(settings["stream timeout"] * int(1000000)),
+            )
+            if stream["proxy"]:
+                ffmpegcmd = ffmpegcmd.replace("<proxy>", stream["proxy"])
+            else:
+                ffmpegcmd = ffmpegcmd.replace("-http_proxy <proxy>", "")
+            " ".join(ffmpegcmd.split())  # cleans up multiple whitespaces
+            ffmpegcmd = ffmpegcmd.split()
+        return ffmpegcmd
 
-
-@app.route("/portals", methods=["GET"])
-@authorise
-def portals():
-    return render_template("portals.html", portals=getPortals())
-
-
-@app.route("/portal/add", methods=["POST"])
-@authorise
-def portalsAdd():
-    id = uuid.uuid4().hex
-    enabled = "true"
-    name = request.form["name"]
-    url = request.form["url"]
-    macs = list(set(request.form["macs"].split(",")))
-    streamsPerMac = request.form["streams per mac"]
-    proxy = request.form["proxy"]
-
-    if not url.endswith(".php"):
-        url = stb.getUrl(url, proxy)
-        if not url:
-            logger.error("Error getting URL for Portal({})".format(name))
-            flash("Error getting URL for Portal({})".format(name), "danger")
-            return redirect("/portals", code=302)
-
-    macsd = {}
-
-    for mac in macs:
-        token = stb.getToken(url, mac, proxy)
-        if token:
-            stb.getProfile(url, mac, token, proxy)
-            expiry = stb.getExpires(url, mac, token, proxy)
-            if expiry:
-                macsd[mac] = expiry
-                logger.info(
-                    "Successfully tested MAC({}) for Portal({})".format(mac, name)
-                )
-                flash(
-                    "Successfully tested MAC({}) for Portal({})".format(mac, name),
-                    "success",
-                )
-                continue
-
-        logger.error("Error testing MAC({}) for Portal({})".format(mac, name))
-        flash("Error testing MAC({}) for Portal({})".format(mac, name), "danger")
-
-    if len(macsd) > 0:
-        portal = {
-            "enabled": enabled,
-            "name": name,
-            "url": url,
-            "macs": macsd,
-            "streams per mac": streamsPerMac,
-            "proxy": proxy,
-        }
-
-        for setting, default in defaultPortal.items():
-            if not portal.get(setting):
-                portal[setting] = default
-
-        portals = getPortals()
-        portals[id] = portal
-        savePortals(portals)
-        logger.info("Portal({}) added!".format(portal["name"]))
-
-    else:
-        logger.error(
-            "None of the MACs tested OK for Portal({}). Adding not successfull".format(
-                name
+    def occupy():
+        occupied.setdefault(stream["source id"], [])
+        occupied.get(stream["source id"], []).append(stream)
+        logger.info(
+            "Occupied Source({}):Account({})".format(
+                stream["source id"], stream["account"]
             )
         )
 
-    return redirect("/portals", code=302)
+    def unoccupy():
+        occupied.get(stream["source id"], []).remove(stream)
+        logger.info(
+            "Unoccupied Source({}):Account({})".format(
+                stream["source id"], stream["account"]
+            )
+        )
+
+    def calculate_stream_duration():
+        streamDuration = datetime.now(timezone.utc).timestamp() - startTime
+        return streamDuration
+
+    def stream_ffmpeg():
+        nonlocal stream_canceled
+
+        def read_stderr(ffmpeg_sp, last_stderr):
+            while ffmpeg_sp.poll() is None:
+                try:
+                    line = ffmpeg_sp.stderr.readline()
+                except Exception as e:
+                    break
+                if not line:
+                    break
+                # Decode new line and keep latest 10 lines
+                stderr_text = line.decode("utf-8").strip()
+                logger.debug("FFMPEG stderr: " + stderr_text)
+                last_stderr.append(stderr_text)
+                if len(last_stderr) > 10:
+                    last_stderr.pop(0)
+
+        last_stderr = []  # list to save the last stderr output
+        try:
+            with subprocess.Popen(
+                ffmpegcmd,
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            ) as ffmpeg_sp:
+                # Start reading stderr of ffmpeg in seperate thread
+                stderr_thread = threading.Thread(
+                    target=read_stderr, args=(ffmpeg_sp, last_stderr)
+                )
+                stderr_thread.start()
+
+                while True:
+                    # read ffmpeg stdout buffer
+                    chunk = ffmpeg_sp.stdout.read(1024)
+
+                    if len(chunk) == 0:
+                        logger.debug("No stream data from ffmpeg detected.")
+                        if ffmpeg_sp.poll() is not None:
+                            logger.debug(
+                                "Ffmpeg process closed unexpectedly with return / error code ({}).".format(
+                                    str(ffmpeg_sp.poll())
+                                )
+                            )
+                            # Check errors
+                            error_text = "\n".join(last_stderr)
+                            if "I/O error" in error_text:
+                                # stream ended / closed by server
+                                stream_canceled = True
+                                logger.info(
+                                    "Stream to client ({}) from Portal ({}) was closed.".format(
+                                        stream["client"], stream["source name"]
+                                    )
+                                )
+                            elif "Operation timed out" in error_text:
+                                logger.info(
+                                    "Stream to client ({}) from Portal ({}) timed out.".format(
+                                        stream["client"], stream["source name"]
+                                    )
+                                )
+                            else:
+                                logger.debug(
+                                    "Stream with ffmpeg process stopped with unknown error:\n{}".format(
+                                        error_text
+                                    )
+                                )
+                            # stop stream
+                            break
+                    yield chunk
+        except Exception as e:
+            pass
+        finally:
+            if stderr_thread.is_alive():
+                stderr_thread.join(timeout=0.2)  # Wait for the end of the stderr thread
+            ffmpeg_sp.kill()
+
+    def stream_direct():
+        nonlocal stream_canceled
+        try:
+            # Send a request to the source video stream URL
+            reqTimeout = int(settings["stream timeout"])  # Request timeout in seconds
+            response = requests.get(stream["link"], stream=True, timeout=reqTimeout)
+
+            # Check if the request was successful
+            if response.status_code == 200:
+                # Start stream
+                for chunk in response.iter_content(chunk_size=1024):
+                    if len(chunk) == 0:
+                        logger.info("No stream data.")
+                        return
+                    yield chunk
+            else:
+                logger.error(
+                    "Couldn't connect to stream URL ({}).\n Request stopped with status code ({}).".format(
+                        stream["link"], response.status_code
+                    )
+                )
+        except requests.exceptions.Timeout:
+            logger.error("Stream request to URL ({}) timed out.".format(stream["link"]))
+            return
+        except requests.exceptions.RequestException as e:
+            logger.error(
+                "Stream request to URL ({}) ended with error:\n{}".format(
+                    stream["link"], e
+                )
+            )
+            return
+        except Exception as e:
+            logger.error(
+                "Stream from direct buffer raised an unknown error:\n{}".format(e)
+            )
+            return
+
+        # stream ended / closed by server
+        stream_canceled = True
+        logger.info(
+            "Stream to client ({}) from Portal ({}) was closed.".format(
+                stream["client"], stream["source name"]
+            )
+        )
+
+    # Start new stream
+    startTime = datetime.now(timezone.utc).timestamp()
+    stream_canceled = False
+    try:
+        occupy()
+        if stream["web"] or settings["stream method"] == "ffmpeg":
+            ffmpegcmd = build_ffmpeg_command(stream)
+            logger.debug("Start Stream by ffmpeg.")
+            for chunk in stream_ffmpeg():
+                yield chunk
+        else:
+            logger.debug("Start Stream by direct buffer.")
+            for chunk in stream_direct():
+                yield chunk
+    except GeneratorExit:
+        logger.info("Stream closed by client.")
+        pass
+    except Exception as e:
+        pass
+    finally:
+        unoccupy()
+        stream_duration = round(calculate_stream_duration(), 1)
+        type = stream["type"]
+        if type == "mac":
+            sources[stream["source id"]]["macs"][stream["account"]][
+                "playtime"
+            ] += stream_duration
+            sources[stream["source id"]]["macs"][stream["account"]][
+                "errors"
+            ] += stream_canceled
+        elif type == "xtream":
+            pass
+        elif type == "m3u":
+            pass
+
+        if stream_canceled and stream_duration <= 60:
+            logger.info(
+                "A forced disconnection by the server after a short stream time indicates that mac address might be over-used."
+            )
+        save_sources()
 
 
-@app.route("/portal/update", methods=["POST"])
-@authorise
-def portalUpdate():
-    id = request.form["id"]
-    enabled = request.form.get("enabled", "false")
-    name = request.form["name"]
-    url = request.form["url"]
-    newmacs = list(set(request.form["macs"].split(",")))
-    streamsPerMac = request.form["streams per mac"]
-    proxy = request.form["proxy"]
-    retest = request.form.get("retest", None)
+def float_to_timestamp(decimal_hours):
+    hours = int(decimal_hours)
+    minutes = int((decimal_hours - hours) * 60)
 
-    if not url.endswith(".php"):
-        url = stb.getUrl(url, proxy)
-        if not url:
-            logger.error("Error getting URL for Portal({})".format(name))
-            flash("Error getting URL for Portal({})".format(name), "danger")
-            return redirect("/portals", code=302)
+    sign = "+" if hours >= 0 else "-"
+    hours = abs(hours)
 
-    portals = getPortals()
-    oldmacs = portals[id]["macs"]
-    macsout = {}
-    deadmacs = []
+    return f"{sign}{hours:02d}{minutes:02d}"
 
-    for mac in newmacs:
-        if retest or mac not in oldmacs.keys():
+
+# endregion
+
+
+# region mac functions
+def mac_get_url(url_in, proxy=None):
+    def parse_response(endpoint, data):
+        java = data.text.replace(" ", "").replace("'", "").replace("+", "")
+        pattern = re.search(r"varpattern.*\/(\(http.*)\/;", java).group(1)
+        result = re.search(pattern, endpoint)
+        protocolIndex = re.search(r"this\.portal_protocol.*(\d).*;", java).group(1)
+        ipIndex = re.search(r"this\.portal_ip.*(\d).*;", java).group(1)
+        pathIndex = re.search(r"this\.portal_path.*(\d).*;", java).group(1)
+        protocol = result.group(int(protocolIndex))
+        ip = result.group(int(ipIndex))
+        path = result.group(int(pathIndex))
+        portalPatern = re.search(r"this\.ajax_loader=(.*\.php);", java).group(1)
+        portal = (
+            portalPatern.replace("this.portal_protocol", protocol)
+            .replace("this.portal_ip", ip)
+            .replace("this.portal_path", path)
+        )
+        return portal
+
+    url_root = urlparse(url_in).scheme + "://" + urlparse(url_in).netloc
+
+    endpoints = [
+        "/c/xpcom.common.js",
+        "/client/xpcom.common.js",
+        "/c_/xpcom.common.js",
+        "/stalker_portal/c/xpcom.common.js",
+        "/stalker_portal/c_/xpcom.common.js",
+    ]
+
+    proxies = {"http": proxy, "https": proxy}
+    headers = {"User-Agent": "Mozilla/5.0 (QtEmbedded; U; Linux; C)"}
+
+    try:
+        for e in endpoints:
+            try:
+                response = requests.get(url_root + e, headers=headers, proxies=proxies)
+            except:
+                response = None
+            if response:
+                return parse_response(url_root + e, response)
+    except:
+        pass
+
+    return url_in
+
+
+def mac_get_token(url, mac, proxy=None):
+    proxies = {"http": proxy, "https": proxy}
+    cookies = {"mac": mac, "stb_lang": "en", "timezone": "Europe/London"}
+    headers = {"User-Agent": "Mozilla/5.0 (QtEmbedded; U; Linux; C)"}
+    try:
+        response = requests.get(
+            url + "?type=stb&action=handshake&JsHttpRequest=1-xml",
+            cookies=cookies,
+            headers=headers,
+            proxies=proxies,
+        )
+        token = response.json()["js"]["token"]
+        if token:
+            return token
+    except:
+        pass
+
+
+def mac_get_profile(url, mac, token, proxy=None):
+    proxies = {"http": proxy, "https": proxy}
+    cookies = {"mac": mac, "stb_lang": "en", "timezone": "Europe/London"}
+    headers = {
+        "User-Agent": "Mozilla/5.0 (QtEmbedded; U; Linux; C)",
+        "Authorization": "Bearer " + token,
+    }
+    try:
+        response = requests.get(
+            url + "?type=stb&action=get_profile&JsHttpRequest=1-xml",
+            cookies=cookies,
+            headers=headers,
+            proxies=proxies,
+        )
+        profile = response.json()["js"]
+        if profile:
+            return profile
+    except:
+        pass
+
+
+def mac_get_expires(url, mac, token, proxy=None):
+    proxies = {"http": proxy, "https": proxy}
+    cookies = {"mac": mac, "stb_lang": "en", "timezone": "Europe/London"}
+    headers = {
+        "User-Agent": "Mozilla/5.0 (QtEmbedded; U; Linux; C)",
+        "Authorization": "Bearer " + token,
+    }
+    try:
+        response = requests.get(
+            url + "?type=account_info&action=get_main_info&JsHttpRequest=1-xml",
+            cookies=cookies,
+            headers=headers,
+            proxies=proxies,
+        )
+        expires = response.json()["js"]["phone"]
+        if expires:
+            return expires
+    except:
+        pass
+
+
+def mac_get_all_channels(url, mac, token, proxy=None):
+    proxies = {"http": proxy, "https": proxy}
+    cookies = {"mac": mac, "stb_lang": "en", "timezone": "Europe/London"}
+    headers = {
+        "User-Agent": "Mozilla/5.0 (QtEmbedded; U; Linux; C)",
+        "Authorization": "Bearer " + token,
+    }
+    try:
+        response = requests.get(
+            url
+            + "?type=itv&action=get_all_channels&force_ch_link_check=&JsHttpRequest=1-xml",
+            cookies=cookies,
+            headers=headers,
+            proxies=proxies,
+        )
+        channels = response.json()["js"]["data"]
+        if channels:
+            return channels
+    except:
+        pass
+
+
+def mac_get_groups(url, mac, token, proxy=None):
+    proxies = {"http": proxy, "https": proxy}
+    cookies = {"mac": mac, "stb_lang": "en", "timezone": "Europe/London"}
+    headers = {
+        "User-Agent": "Mozilla/5.0 (QtEmbedded; U; Linux; C)",
+        "Authorization": "Bearer " + token,
+    }
+    try:
+        response = requests.get(
+            url + "?action=get_genres&type=itv&JsHttpRequest=1-xml",
+            cookies=cookies,
+            headers=headers,
+            proxies=proxies,
+        )
+        genreData = response.json()["js"]
+        if genreData:
+            return genreData
+    except:
+        pass
+
+
+def mac_get_group_names(url, mac, token, proxy=None):
+    try:
+        genreData = mac_get_groups(url, mac, token, proxy)
+        genres = {}
+        for i in genreData:
+            gid = i["id"]
+            name = i["title"]
+            genres[gid] = name
+        if genres:
+            return genres
+    except:
+        pass
+
+
+def mac_get_link(url, mac, token, cmd, proxy=None):
+    proxies = {"http": proxy, "https": proxy}
+    cookies = {"mac": mac, "stb_lang": "en", "timezone": "Europe/London"}
+    headers = {
+        "User-Agent": "Mozilla/5.0 (QtEmbedded; U; Linux; C)",
+        "Authorization": "Bearer " + token,
+    }
+    try:
+        response = requests.get(
+            url
+            + "?type=itv&action=create_link&cmd="
+            + cmd
+            + "&series=0&forced_storage=false&disable_ad=false&download=false&force_ch_link_check=false&JsHttpRequest=1-xml",
+            cookies=cookies,
+            headers=headers,
+            proxies=proxies,
+        )
+        data = response.json()
+        link = data["js"]["cmd"].split()[-1]
+        if link:
+            return link
+    except:
+        pass
+
+
+def mac_get_epg(url, mac, token, period, proxy=None):
+    proxies = {"http": proxy, "https": proxy}
+    cookies = {"mac": mac, "stb_lang": "en", "timezone": "Europe/London"}
+    headers = {
+        "User-Agent": "Mozilla/5.0 (QtEmbedded; U; Linux; C)",
+        "Authorization": "Bearer " + token,
+    }
+    try:
+        response = requests.get(
+            url
+            + "?type=itv&action=get_epg_info&period="
+            + str(period)
+            + "&JsHttpRequest=1-xml",
+            cookies=cookies,
+            headers=headers,
+            proxies=proxies,
+        )
+        data = response.json()["js"]["data"]
+        if data:
+            return data
+    except:
+        pass
+
+
+def mac_save(id, form):
+    source = sources.get(id, copy.deepcopy(default_mac))
+    enabled = bool(form.get("enabled", False))
+    name = form["name"]
+    url = form["url"]
+    macs = ast.literal_eval(form["macs"])
+    epgTimeOffset = float(request.form["epg time offset"])
+    retest = bool(form.get("retest", False))
+
+    for m in dict(macs):
+        if retest or macs[m]["expiry"] == "Untested":
+            mac = macs[m]["mac"]
+            proxy = macs[m]["proxy"]
             token = stb.getToken(url, mac, proxy)
             if token:
                 stb.getProfile(url, mac, token, proxy)
                 expiry = stb.getExpires(url, mac, token, proxy)
                 if expiry:
-                    macsout[mac] = expiry
+                    macs[m]["expiry"] = parse_expiery_string(expiry)
                     logger.info(
                         "Successfully tested MAC({}) for Portal({})".format(mac, name)
                     )
@@ -302,630 +731,179 @@ def portalUpdate():
                         "Successfully tested MAC({}) for Portal({})".format(mac, name),
                         "success",
                     )
+                    continue
 
-            if mac not in list(macsout.keys()):
-                deadmacs.append(mac)
-
-        if mac in oldmacs.keys() and mac not in deadmacs:
-            macsout[mac] = oldmacs[mac]
-
-        if mac not in macsout.keys():
+            del macs[m]
             logger.error("Error testing MAC({}) for Portal({})".format(mac, name))
             flash("Error testing MAC({}) for Portal({})".format(mac, name), "danger")
 
-    if len(macsout) > 0:
-        portals[id]["enabled"] = enabled
-        portals[id]["name"] = name
-        portals[id]["url"] = url
-        portals[id]["macs"] = macsout
-        portals[id]["streams per mac"] = streamsPerMac
-        portals[id]["proxy"] = proxy
-        savePortals(portals)
-        logger.info("Portal({}) updated!".format(name))
-        flash("Portal({}) updated!".format(name), "success")
+    source["enabled"] = enabled
+    source["name"] = name
+    source["url"] = url
+    source["epg time offset"] = epgTimeOffset
+    source["macs"] = macs
 
-    else:
-        logger.error(
-            "None of the MACs tested OK for Portal({}). Adding not successfull".format(
-                name
-            )
-        )
-
-    return redirect("/portals", code=302)
+    sources[id] = source
+    save_sources()
+    logger.info("Source({}) saved!".format(name))
+    flash("Source({}) saved!".format(name), "success")
 
 
-@app.route("/portal/remove", methods=["POST"])
-@authorise
-def portalRemove():
-    id = request.form["deleteId"]
-    portals = getPortals()
-    name = portals[id]["name"]
-    del portals[id]
-    savePortals(portals)
-    logger.info("Portal ({}) removed!".format(name))
-    flash("Portal ({}) removed!".format(name), "success")
-    return redirect("/portals", code=302)
+def mac_get_playlist_table_data(id, source):
+    data = []
+    url = source["url"]
+    macs = source["macs"]
+    enabled_channels = source["enabled channels"]
+    custom_channel_names = source["custom channel names"]
+    custom_groups = source["custom groups"]
+    custom_channel_numbers = source["custom channel numbers"]
+    custom_epg_ids = source["custom epg ids"]
+    fallback_channels = source["fallback channels"]
 
+    all_channels = None
+    groups = None
 
-@app.route("/editor", methods=["GET"])
-@authorise
-def editor():
-    return render_template("editor.html")
-
-
-@app.route("/editor_data", methods=["GET"])
-@authorise
-def editor_data():
-    channels = []
-    portals = getPortals()
-    for portal in portals:
-        if portals[portal]["enabled"] == "true":
-            portalName = portals[portal]["name"]
-            url = portals[portal]["url"]
-            macs = list(portals[portal]["macs"].keys())
-            proxy = portals[portal]["proxy"]
-            enabledChannels = portals[portal].get("enabled channels", [])
-            customChannelNames = portals[portal].get("custom channel names", {})
-            customGenres = portals[portal].get("custom genres", {})
-            customChannelNumbers = portals[portal].get("custom channel numbers", {})
-            customEpgIds = portals[portal].get("custom epg ids", {})
-            fallbackChannels = portals[portal].get("fallback channels", {})
-
-            for mac in macs:
-                try:
-                    token = stb.getToken(url, mac, proxy)
-                    stb.getProfile(url, mac, token, proxy)
-                    allChannels = stb.getAllChannels(url, mac, token, proxy)
-                    genres = stb.getGenreNames(url, mac, token, proxy)
-                    break
-                except:
-                    allChannels = None
-                    genres = None
-
-            if allChannels and genres:
-                for channel in allChannels:
-                    channelId = str(channel["id"])
-                    channelName = str(channel["name"])
-                    channelNumber = str(channel["number"])
-                    genre = str(genres.get(str(channel["tv_genre_id"])))
-                    if channelId in enabledChannels:
-                        enabled = True
-                    else:
-                        enabled = False
-                    customChannelNumber = customChannelNumbers.get(channelId)
-                    if customChannelNumber == None:
-                        customChannelNumber = ""
-                    customChannelName = customChannelNames.get(channelId)
-                    if customChannelName == None:
-                        customChannelName = ""
-                    customGenre = customGenres.get(channelId)
-                    if customGenre == None:
-                        customGenre = ""
-                    customEpgId = customEpgIds.get(channelId)
-                    if customEpgId == None:
-                        customEpgId = ""
-                    fallbackChannel = fallbackChannels.get(channelId)
-                    if fallbackChannel == None:
-                        fallbackChannel = ""
-                    channels.append(
-                        {
-                            "portal": portal,
-                            "portalName": portalName,
-                            "enabled": enabled,
-                            "channelNumber": channelNumber,
-                            "customChannelNumber": customChannelNumber,
-                            "channelName": channelName,
-                            "customChannelName": customChannelName,
-                            "genre": genre,
-                            "customGenre": customGenre,
-                            "channelId": channelId,
-                            "customEpgId": customEpgId,
-                            "fallbackChannel": fallbackChannel,
-                            "link": "http://"
-                            + host
-                            + "/play/"
-                            + portal
-                            + "/"
-                            + channelId
-                            + "?web=true",
-                        }
-                    )
-            else:
-                logger.error(
-                    "Error getting channel data for {}, skipping".format(portalName)
-                )
-                flash(
-                    "Error getting channel data for {}, skipping".format(portalName),
-                    "danger",
-                )
-
-    data = {"data": channels}
-
-    return flask.jsonify(data)
-
-
-@app.route("/editor/save", methods=["POST"])
-@authorise
-def editorSave():
-    enabledEdits = json.loads(request.form["enabledEdits"])
-    numberEdits = json.loads(request.form["numberEdits"])
-    nameEdits = json.loads(request.form["nameEdits"])
-    genreEdits = json.loads(request.form["genreEdits"])
-    epgEdits = json.loads(request.form["epgEdits"])
-    fallbackEdits = json.loads(request.form["fallbackEdits"])
-    portals = getPortals()
-    for edit in enabledEdits:
-        portal = edit["portal"]
-        channelId = edit["channel id"]
-        enabled = edit["enabled"]
-        if enabled:
-            portals[portal].setdefault("enabled channels", [])
-            portals[portal]["enabled channels"].append(channelId)
-        else:
-            portals[portal]["enabled channels"] = list(
-                filter((channelId).__ne__, portals[portal]["enabled channels"])
-            )
-
-    for edit in numberEdits:
-        portal = edit["portal"]
-        channelId = edit["channel id"]
-        customNumber = edit["custom number"]
-        if customNumber:
-            portals[portal].setdefault("custom channel numbers", {})
-            portals[portal]["custom channel numbers"].update({channelId: customNumber})
-        else:
-            portals[portal]["custom channel numbers"].pop(channelId)
-
-    for edit in nameEdits:
-        portal = edit["portal"]
-        channelId = edit["channel id"]
-        customName = edit["custom name"]
-        if customName:
-            portals[portal].setdefault("custom channel names", {})
-            portals[portal]["custom channel names"].update({channelId: customName})
-        else:
-            portals[portal]["custom channel names"].pop(channelId)
-
-    for edit in genreEdits:
-        portal = edit["portal"]
-        channelId = edit["channel id"]
-        customGenre = edit["custom genre"]
-        if customGenre:
-            portals[portal].setdefault("custom genres", {})
-            portals[portal]["custom genres"].update({channelId: customGenre})
-        else:
-            portals[portal]["custom genres"].pop(channelId)
-
-    for edit in epgEdits:
-        portal = edit["portal"]
-        channelId = edit["channel id"]
-        customEpgId = edit["custom epg id"]
-        if customEpgId:
-            portals[portal].setdefault("custom epg ids", {})
-            portals[portal]["custom epg ids"].update({channelId: customEpgId})
-        else:
-            portals[portal]["custom epg ids"].pop(channelId)
-
-    for edit in fallbackEdits:
-        portal = edit["portal"]
-        channelId = edit["channel id"]
-        channelName = edit["channel name"]
-        if channelName:
-            portals[portal].setdefault("fallback channels", {})
-            portals[portal]["fallback channels"].update({channelId: channelName})
-        else:
-            portals[portal]["fallback channels"].pop(channelId)
-
-    savePortals(portals)
-    logger.info("Playlist config saved!")
-    flash("Playlist config saved!", "success")
-
-    return redirect("/editor", code=302)
-
-
-@app.route("/editor/reset", methods=["POST"])
-@authorise
-def editorReset():
-    portals = getPortals()
-    for portal in portals:
-        portals[portal]["enabled channels"] = []
-        portals[portal]["custom channel numbers"] = {}
-        portals[portal]["custom channel names"] = {}
-        portals[portal]["custom genres"] = {}
-        portals[portal]["custom epg ids"] = {}
-        portals[portal]["fallback channels"] = {}
-
-    savePortals(portals)
-    logger.info("Playlist reset!")
-    flash("Playlist reset!", "success")
-
-    return redirect("/editor", code=302)
-
-
-@app.route("/settings", methods=["GET"])
-@authorise
-def settings():
-    settings = getSettings()
-    return render_template(
-        "settings.html", settings=settings, defaultSettings=defaultSettings
-    )
-
-
-@app.route("/settings/save", methods=["POST"])
-@authorise
-def save():
-    settings = {}
-
-    for setting, _ in defaultSettings.items():
-        value = request.form.get(setting, "false")
-        settings[setting] = value
-
-    saveSettings(settings)
-    logger.info("Settings saved!")
-    flash("Settings saved!", "success")
-    return redirect("/settings", code=302)
-
-
-@app.route("/playlist", methods=["GET"])
-@authorise
-def playlist():
-    channels = []
-    portals = getPortals()
-    for portal in portals:
-        if portals[portal]["enabled"] == "true":
-            enabledChannels = portals[portal].get("enabled channels", [])
-            if len(enabledChannels) != 0:
-                name = portals[portal]["name"]
-                url = portals[portal]["url"]
-                macs = list(portals[portal]["macs"].keys())
-                proxy = portals[portal]["proxy"]
-                customChannelNames = portals[portal].get("custom channel names", {})
-                customGenres = portals[portal].get("custom genres", {})
-                customChannelNumbers = portals[portal].get("custom channel numbers", {})
-                customEpgIds = portals[portal].get("custom epg ids", {})
-
-                for mac in macs:
-                    try:
-                        token = stb.getToken(url, mac, proxy)
-                        stb.getProfile(url, mac, token, proxy)
-                        allChannels = stb.getAllChannels(url, mac, token, proxy)
-                        genres = stb.getGenreNames(url, mac, token, proxy)
-                        break
-                    except:
-                        allChannels = None
-                        genres = None
-
-                if allChannels and genres:
-                    for channel in allChannels:
-                        channelId = str(channel.get("id"))
-                        if channelId in enabledChannels:
-                            channelName = customChannelNames.get(channelId)
-                            if channelName == None:
-                                channelName = str(channel.get("name"))
-                            genre = customGenres.get(channelId)
-                            if genre == None:
-                                genreId = str(channel.get("tv_genre_id"))
-                                genre = str(genres.get(genreId))
-                            channelNumber = customChannelNumbers.get(channelId)
-                            if channelNumber == None:
-                                channelNumber = str(channel.get("number"))
-                            epgId = customEpgIds.get(channelId)
-                            if epgId == None:
-                                epgId = portal + channelId
-                            channels.append(
-                                "#EXTINF:-1"
-                                + ' tvg-id="'
-                                + epgId
-                                + (
-                                    '" tvg-chno="' + channelNumber
-                                    if getSettings().get("use channel numbers", "true")
-                                    == "true"
-                                    else ""
-                                )
-                                + (
-                                    '" group-title="' + genre
-                                    if getSettings().get("use channel genres", "true")
-                                    == "true"
-                                    else ""
-                                )
-                                + '",'
-                                + channelName
-                                + "\n"
-                                + "http://"
-                                + host
-                                + "/play/"
-                                + portal
-                                + "/"
-                                + channelId
-                            )
-                else:
-                    logger.error("Error making playlist for {}, skipping".format(name))
-
-    if getSettings().get("sort playlist by channel name", "true") == "true":
-        channels.sort(key=lambda k: k.split(",")[1].split("\n")[0])
-    if getSettings().get("use channel numbers", "true") == "true":
-        if getSettings().get("sort playlist by channel number", "false") == "true":
-            channels.sort(key=lambda k: k.split('tvg-chno="')[1].split('"')[0])
-    if getSettings().get("use channel genres", "true") == "true":
-        if getSettings().get("sort playlist by channel genre", "false") == "true":
-            channels.sort(key=lambda k: k.split('group-title="')[1].split('"')[0])
-
-    playlist = "#EXTM3U \n"
-    playlist = playlist + "\n".join(channels)
-
-    return Response(playlist, mimetype="text/plain")
-
-
-@app.route("/xmltv", methods=["GET"])
-@authorise
-def xmltv():
-    channels = ET.Element("tv")
-    programmes = ET.Element("tv")
-    portals = getPortals()
-    for portal in portals:
-        if portals[portal]["enabled"] == "true":
-            enabledChannels = portals[portal].get("enabled channels", [])
-            if len(enabledChannels) != 0:
-                name = portals[portal]["name"]
-                url = portals[portal]["url"]
-                macs = list(portals[portal]["macs"].keys())
-                proxy = portals[portal]["proxy"]
-                customChannelNames = portals[portal].get("custom channel names", {})
-                customEpgIds = portals[portal].get("custom epg ids", {})
-
-                for mac in macs:
-                    try:
-                        token = stb.getToken(url, mac, proxy)
-                        stb.getProfile(url, mac, token, proxy)
-                        allChannels = stb.getAllChannels(url, mac, token, proxy)
-                        epg = stb.getEpg(url, mac, token, 24, proxy)
-                        break
-                    except:
-                        allChannels = None
-                        epg = None
-
-                if allChannels and epg:
-                    for c in allChannels:
-                        try:
-                            channelId = c.get("id")
-                            if str(channelId) in enabledChannels:
-                                channelName = customChannelNames.get(str(channelId))
-                                if channelName == None:
-                                    channelName = str(c.get("name"))
-                                epgId = customEpgIds.get(channelId)
-                                if epgId == None:
-                                    epgId = portal + channelId
-                                channelEle = ET.SubElement(
-                                    channels, "channel", id=epgId
-                                )
-                                ET.SubElement(
-                                    channelEle, "display-name"
-                                ).text = channelName
-                                ET.SubElement(channelEle, "icon", src=c.get("logo"))
-                                for p in epg.get(channelId):
-                                    try:
-                                        start = (
-                                            datetime.utcfromtimestamp(
-                                                p.get("start_timestamp")
-                                            ).strftime("%Y%m%d%H%M%S")
-                                            + " +0000"
-                                        )
-                                        stop = (
-                                            datetime.utcfromtimestamp(
-                                                p.get("stop_timestamp")
-                                            ).strftime("%Y%m%d%H%M%S")
-                                            + " +0000"
-                                        )
-                                        programmeEle = ET.SubElement(
-                                            programmes,
-                                            "programme",
-                                            start=start,
-                                            stop=stop,
-                                            channel=epgId,
-                                        )
-                                        ET.SubElement(
-                                            programmeEle, "title"
-                                        ).text = p.get("name")
-                                        ET.SubElement(
-                                            programmeEle, "desc"
-                                        ).text = p.get("descr")
-                                    except:
-                                        pass
-                        except:
-                            pass
-                else:
-                    logger.error("Error making XMLTV for {}, skipping".format(name))
-
-    xmltv = channels
-    for programme in programmes.iter("programme"):
-        xmltv.append(programme)
-
-    return Response(
-        ET.tostring(xmltv, encoding="unicode", xml_declaration=True),
-        mimetype="text/xml",
-    )
-
-
-@app.route("/play/<portalId>/<channelId>", methods=["GET"])
-def channel(portalId, channelId):
-    def streamData():
-        def occupy():
-            occupied.setdefault(portalId, [])
-            occupied.get(portalId, []).append(
-                {
-                    "mac": mac,
-                    "channel id": channelId,
-                    "channel name": channelName,
-                    "client": ip,
-                    "portal name": portalName,
-                    "start time": startTime,
-                }
-            )
-            logger.info("Occupied Portal({}):MAC({})".format(portalId, mac))
-
-        def unoccupy():
-            occupied.get(portalId, []).remove(
-                {
-                    "mac": mac,
-                    "channel id": channelId,
-                    "channel name": channelName,
-                    "client": ip,
-                    "portal name": portalName,
-                    "start time": startTime,
-                }
-            )
-            logger.info("Unoccupied Portal({}):MAC({})".format(portalId, mac))
-
+    for m in macs:
+        mac = macs[m]["mac"]
+        proxy = macs[m]["proxy"]
         try:
-            startTime = datetime.now(timezone.utc).timestamp()
-            occupy()
-            with subprocess.Popen(
-                ffmpegcmd,
-                stdin=subprocess.DEVNULL,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.DEVNULL,
-            ) as ffmpeg_sp:
-                while True:
-                    chunk = ffmpeg_sp.stdout.read(1024)
-                    if len(chunk) == 0:
-                        if ffmpeg_sp.poll() != 0:
-                            logger.info("Ffmpeg closed with error({}). Moving MAC({}) for Portal({})".format(str(ffmpeg_sp.poll()), mac, portalName))
-                            moveMac(portalId, mac)
-                        break
-                    yield chunk
+            token = mac_get_token(url, mac, proxy)
+            mac_get_profile(url, mac, token, proxy)
+            all_channels = mac_get_all_channels(url, mac, token, proxy)
+            groups = mac_get_group_names(url, mac, token, proxy)
+            break
         except:
             pass
-        finally:
-            unoccupy()
-            ffmpeg_sp.kill()
 
-    def testStream():
-        timeout = int(getSettings()["ffmpeg timeout"]) * int(1000000)
-        ffprobecmd = ["ffprobe", "-timeout", str(timeout), "-i", link]
+    if all_channels and groups:
+        for channel in all_channels:
+            channel_id = str(channel["id"])
 
-        if proxy:
-            ffprobecmd.insert(1, "-http_proxy")
-            ffprobecmd.insert(2, proxy)
+            data.append(
+                {
+                    "enabled": True if channel_id in enabled_channels else False,
+                    "channel name": str(channel["name"]),
+                    "custom channel name": str(
+                        custom_channel_names.get(channel_id, "")
+                    ),
+                    "channel number": str(channel["number"]),
+                    "custom channel number": str(
+                        custom_channel_numbers.get(channel_id, "")
+                    ),
+                    "group": str(groups.get(str(channel["tv_genre_id"]))),
+                    "custom group": custom_groups.get(channel_id, ""),
+                    "channel id": channel_id,
+                    "epg id": str(channel["xmltv_id"]),
+                    "custom epg id": custom_epg_ids.get(channel_id, ""),
+                    "fallback": fallback_channels.get(channel_id, ""),
+                    "link": "http://"
+                    + host
+                    + "/play/"
+                    + id
+                    + "/"
+                    + channel_id
+                    + "?web=true",
+                }
+            )
 
-        with subprocess.Popen(
-            ffprobecmd,
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-        ) as ffprobe_sb:
-            ffprobe_sb.communicate()
-            if ffprobe_sb.returncode == 0:
+    data = {"data": data}
+    return data
+
+
+def mac_build_stream(source_id, channel_id, ip, web):
+    def is_mac_free(max_streams):
+        # When changing channels, it takes a while until the stream is finished and the Mac address gets released
+        checkInterval = 0.1
+        maxIterations = max(math.ceil(5 / checkInterval), 1)
+        for _ in range(maxIterations):
+            count = 0
+            for i in occupied.get(source_id, []):
+                if i["mac"] == mac:
+                    count = count + 1
+            if count < max_streams:
                 return True
             else:
-                return False
+                time.sleep(0.1)
+        return False
 
-    def isMacFree():
-        count = 0
-        for i in occupied.get(portalId, []):
-            if i["mac"] == mac:
-                count = count + 1
-        if count < streamsPerMac:
-            return True
-        else:
-            return False
+    source = sources[source_id]
+    url = source["url"]
+    macs = source["macs"]
+    source_name = source["name"]
+    free_mac = False
 
-    portal = getPortals().get(portalId)
-    portalName = portal.get("name")
-    url = portal.get("url")
-    macs = list(portal["macs"].keys())
-    streamsPerMac = int(portal.get("streams per mac"))
-    proxy = portal.get("proxy")
-    web = request.args.get("web")
-    ip = request.remote_addr
-
-    logger.info(
-        "IP({}) requested Portal({}):Channel({})".format(ip, portalId, channelId)
-    )
-
-    freeMac = False
-
-    for mac in macs:
+    for m in macs:
         channels = None
         cmd = None
         link = None
-        if streamsPerMac == 0 or isMacFree():
+
+        mac = macs[m]["mac"]
+        proxy = macs[m]["proxy"]
+        max_streams = macs[m]["max streams"]
+
+        if max_streams == 0 or is_mac_free(max_streams):
             logger.info(
-                "Trying Portal({}):MAC({}):Channel({})".format(portalId, mac, channelId)
+                "Trying MAC({}) for Source({}) Channel({})".format(
+                    mac, source_id, channel_id
+                )
             )
-            freeMac = True
-            token = stb.getToken(url, mac, proxy)
+            macs[m]["requests"] += 1
+            save_sources()
+            free_mac = True
+            token = mac_get_token(url, mac, proxy)
             if token:
-                stb.getProfile(url, mac, token, proxy)
-                channels = stb.getAllChannels(url, mac, token, proxy)
+                mac_get_profile(url, mac, token, proxy)
+                channels = mac_get_all_channels(url, mac, token, proxy)
+        else:
+            logger.info("Maximum streams for MAC({}) in use.".format(mac))
 
         if channels:
             for c in channels:
-                if str(c["id"]) == channelId:
-                    channelName = portal.get("custom channel names", {}).get(channelId)
-                    if channelName == None:
-                        channelName = c["name"]
+                if str(c["id"]) == channel_id:
+                    channel_name = source.get("custom channel names", {}).get(
+                        channel_id
+                    )
+                    if not channel_name:
+                        channel_name = c["name"]
+
                     cmd = c["cmd"]
                     break
 
         if cmd:
             if "http://localhost/" in cmd:
-                link = stb.getLink(url, mac, token, cmd, proxy)
+                link = mac_get_link(url, mac, token, cmd, proxy)
             else:
                 link = cmd.split(" ")[1]
 
         if link:
-            if getSettings().get("test streams", "true") == "false" or testStream():
-                if web:
-                    ffmpegcmd = [
-                        "ffmpeg",
-                        "-loglevel",
-                        "panic",
-                        "-hide_banner",
-                        "-i",
-                        link,
-                        "-vcodec",
-                        "copy",
-                        "-f",
-                        "mp4",
-                        "-movflags",
-                        "frag_keyframe+empty_moov",
-                        "pipe:",
-                    ]
-                    if proxy:
-                        ffmpegcmd.insert(1, "-http_proxy")
-                        ffmpegcmd.insert(2, proxy)
-                    return Response(streamData(), mimetype="application/octet-stream")
+            if not settings["test streams"] or test_stream(link, proxy):
+                stream = {
+                    "type": "mac",
+                    "source id": source_id,
+                    "source name": source_name,
+                    "channel id": channel_id,
+                    "channel name": channel_name,
+                    "client": ip,
+                    "account": m,
+                    "start time": datetime.now(timezone.utc).timestamp(),
+                    "link": link,
+                    "proxy": proxy,
+                    "web": web,
+                }
 
-                else:
-                    if getSettings().get("stream method", "ffmpeg") == "ffmpeg":
-                        ffmpegcmd = str(getSettings()["ffmpeg command"])
-                        ffmpegcmd = ffmpegcmd.replace("<url>", link)
-                        ffmpegcmd = ffmpegcmd.replace(
-                            "<timeout>",
-                            str(int(getSettings()["ffmpeg timeout"]) * int(1000000)),
-                        )
-                        if proxy:
-                            ffmpegcmd = ffmpegcmd.replace("<proxy>", proxy)
-                        else:
-                            ffmpegcmd = ffmpegcmd.replace("-http_proxy <proxy>", "")
-                        " ".join(ffmpegcmd.split())  # cleans up multiple whitespaces
-                        ffmpegcmd = ffmpegcmd.split()
-                        return Response(
-                            streamData(), mimetype="application/octet-stream"
-                        )
-                    else:
-                        logger.info("Redirect sent")
-                        return redirect(link)
+                return stream
 
         logger.info(
-            "Unable to connect to Portal({}) using MAC({})".format(portalId, mac)
+            "Unable to connect to Portal({}) using MAC({})".format(source_id, mac)
         )
-        logger.info("Moving MAC({}) for Portal({})".format(mac, portalName))
-        moveMac(portalId, mac)
 
-        if not getSettings().get("try all macs", "false") == "true":
+        if not settings["try all macs"]:
             break
 
+    return None
+
+    # disabled for now
+    # Look for fallback
     if not web:
         logger.info(
             "Portal({}):Channel({}) is not working. Looking for fallbacks...".format(
@@ -933,7 +911,6 @@ def channel(portalId, channelId):
             )
         )
 
-        portals = getPortals()
         for portal in portals:
             if portals[portal]["enabled"] == "true":
                 fallbackChannels = portals[portal]["fallback channels"]
@@ -980,48 +957,20 @@ def channel(portalId, channelId):
                                                             portalId, channelId
                                                         )
                                                     )
+                                                    portal["macs"][mac]["stats"][
+                                                        "requests"
+                                                    ] += 1
+                                                    savePortals(portals)
                                                     if (
                                                         getSettings().get(
                                                             "stream method", "ffmpeg"
                                                         )
-                                                        == "ffmpeg"
+                                                        != "redirect"
                                                     ):
-                                                        ffmpegcmd = str(
-                                                            getSettings()[
-                                                                "ffmpeg command"
-                                                            ]
-                                                        )
-                                                        ffmpegcmd = ffmpegcmd.replace(
-                                                            "<url>", link
-                                                        )
-                                                        ffmpegcmd = ffmpegcmd.replace(
-                                                            "<timeout>",
-                                                            str(
-                                                                int(
-                                                                    getSettings()[
-                                                                        "ffmpeg timeout"
-                                                                    ]
-                                                                )
-                                                                * int(1000000)
-                                                            ),
-                                                        )
-                                                        if proxy:
-                                                            ffmpegcmd = (
-                                                                ffmpegcmd.replace(
-                                                                    "<proxy>", proxy
-                                                                )
-                                                            )
-                                                        else:
-                                                            ffmpegcmd = ffmpegcmd.replace(
-                                                                "-http_proxy <proxy>",
-                                                                "",
-                                                            )
-                                                        " ".join(
-                                                            ffmpegcmd.split()
-                                                        )  # cleans up multiple whitespaces
-                                                        ffmpegcmd = ffmpegcmd.split()
                                                         return Response(
-                                                            streamData(),
+                                                            stream_with_context(
+                                                                streamData()
+                                                            ),
                                                             mimetype="application/octet-stream",
                                                         )
                                                     else:
@@ -1039,7 +988,278 @@ def channel(portalId, channelId):
             "No free MAC for Portal({}):Channel({})".format(portalId, channelId)
         )
 
-    return make_response("No streams available", 503)
+
+# endregion
+
+
+# region routes
+@app.route("/", methods=["GET"])
+@authorise
+def home():
+    return redirect("/sources")
+
+
+@app.route("/sources", methods=["GET"])
+@authorise
+def sources_page():
+    return render_template("sources.html", sources=sources)
+
+
+@app.route("/sources/add", methods=["POST"])
+@authorise
+def add_source():
+    id = uuid.uuid4().hex
+    type = request.form["type"]
+
+    if type == "mac":
+        return render_template("mac.html", source=default_mac, id=id, type="mac")
+    elif type == "xtream":
+        pass
+    elif type == "m3u":
+        pass
+
+
+@app.route("/source/edit", methods=["POST"])
+@authorise
+def source_edit():
+    id = request.form["id"]
+    source = sources[id]
+    type = source["type"]
+
+    if type == "mac":
+        return render_template("mac.html", source=source, id=id, type="mac")
+    elif type == "xtream":
+        pass
+    elif type == "m3u":
+        pass
+
+
+@app.route("/source/save", methods=["POST"])
+@authorise
+def source_save():
+    id = request.form["id"]
+    type = request.form["type"]
+
+    if type == "mac":
+        mac_save(id, request.form)
+    elif type == "xtream":
+        pass
+    elif type == "m3u":
+        pass
+
+    return render_template("sources.html", sources=sources)
+
+
+@app.route("/source/delete", methods=["POST"])
+@authorise
+def portalRemove():
+    id = request.form["id"]
+    portals = getPortals()
+    name = portals[id]["name"]
+    del portals[id]
+    savePortals(portals)
+    logger.info("Portal ({}) removed!".format(name))
+    flash("Portal ({}) removed!".format(name), "success")
+    return redirect("/portals", code=302)
+
+
+@app.route("/playlist/edit", methods=["POST"])
+@authorise
+def playlist_edit():
+    id = request.form["id"]
+    return render_template("playlist_editor.html", id=id)
+
+
+@app.route("/playlist_table_data", methods=["GET"])
+@authorise
+def playlist_table_data():
+    id = request.args["id"]
+    source = sources[id]
+    type = source["type"]
+
+    if type == "mac":
+        data = mac_get_playlist_table_data(id, source)
+
+    return flask.jsonify(data)
+
+
+@app.route("/playlist/save", methods=["POST"])
+@authorise
+def editorSave():
+    id = request.form["id"]
+    source = sources[id]
+    name = source["name"]
+    enable_edits = json.loads(request.form["enable edits"])
+    number_edits = json.loads(request.form["number edits"])
+    name_edits = json.loads(request.form["name edits"])
+    group_edits = json.loads(request.form["group edits"])
+    epg_edits = json.loads(request.form["epg edits"])
+    fallback_edits = json.loads(request.form["fallback edits"])
+
+    for edit in enable_edits:
+        channel_id = edit["channel id"]
+        enabled = edit["enabled"]
+        if enabled:
+            source["enabled channels"].append(channel_id)
+        else:
+            source["enabled channels"] = list(
+                filter((channel_id).__ne__, source["enabled channels"])
+            )
+
+    for edit in number_edits:
+        channel_id = edit["channel id"]
+        custom_number = edit["custom number"]
+        if custom_number:
+            source["custom channel numbers"].update({channel_id: custom_number})
+        else:
+            source["custom channel numbers"].pop(channel_id)
+
+    for edit in name_edits:
+        channel_id = edit["channel id"]
+        custom_name = edit["custom name"]
+        if custom_name:
+            source["custom channel names"].update({channel_id: custom_name})
+        else:
+            source["custom channel names"].pop(channel_id)
+
+    for edit in group_edits:
+        channel_id = edit["channel id"]
+        custom_group = edit["custom group"]
+        if custom_group:
+            source["custom groups"].update({channel_id: custom_group})
+        else:
+            source["custom groups"].pop(channel_id)
+
+    for edit in epg_edits:
+        channel_id = edit["channel id"]
+        custom_epg_id = edit["custom epg id"]
+        if custom_epg_id:
+            source["custom epg ids"].update({channel_id: custom_epg_id})
+        else:
+            source["custom epg ids"].pop(channel_id)
+
+    for edit in fallback_edits:
+        channel_id = edit["channel id"]
+        fallback = edit["fallback"]
+        if fallback:
+            source["fallback channels"].update({channel_id: fallback})
+        else:
+            source["fallback channels"].pop(channel_id)
+
+    sources[id] = source
+    save_sources()
+    logger.info("Playlist({}) saved!".format(name))
+    flash("Playlist({}) saved!".format(name), "success")
+
+    return redirect("/sources")
+
+
+@app.route("/playlist/reset", methods=["POST"])
+@authorise
+def editorReset():
+    id = request.form.get("id")
+    source = sources[id]
+
+    source["enabled channels"] = []
+    source["custom channel numbers"] = {}
+    source["custom channel names"] = {}
+    source["custom groups"] = {}
+    source["custom epg ids"] = {}
+    source["fallback channels"] = {}
+
+    sources[id] = source
+    save_sources()
+
+    logger.info("Playlist reset!")
+    flash("Playlist reset!", "success")
+
+    return redirect("/sources", code=302)
+
+
+@app.route("/settings", methods=["GET"])
+@authorise
+def settings():
+    return render_template(
+        "settings.html", settings=settings, default_settings=default_settings
+    )
+
+
+@app.route("/settings/save", methods=["POST"])
+@authorise
+def save():
+    global settings
+    settings = {
+        "stream method": request.form.get("stream method"),
+        "stream timeout": int(request.form.get("stream timeout")),
+        "stream chunk size": int(request.form.get("stream chunk size")),
+        "ffmpeg command": request.form.get("ffmpeg command"),
+        "test streams": True if request.form.get("test streams") else False,
+        "use channel groups": True if request.form.get("use channel groups") else False,
+        "use channel numbers": True
+        if request.form.get("use channel numbers")
+        else False,
+        "sort playlists by channel group": True
+        if request.form.get("sort playlists by channel group")
+        else False,
+        "sort playlists by channel number": True
+        if request.form.get("sort playlists by channel number")
+        else False,
+        "sort playlists by channel name": True
+        if request.form.get("sort playlists by channel name")
+        else False,
+        "enable security": True if request.form.get("enable security") else False,
+        "username": request.form.get("username"),
+        "password": request.form.get("password"),
+        "enable hdhr": True if request.form.get("enable hdhr") else False,
+        "hdhr name": request.form.get("hdhr name"),
+        "hdhr id": request.form.get("hdhr id"),
+        "hdhr tuners": int(request.form.get("hdhr tuners")),
+    }
+
+    save_settings()
+    logger.info("Settings saved!")
+    flash("Settings saved!", "success")
+
+    return redirect("/settings")
+
+
+@app.route("/playlist", methods=["GET"])
+@authorise
+def playlist():
+    return
+
+
+@app.route("/xmltv", methods=["GET"])
+@authorise
+def xmltv():
+    return
+
+
+@app.route("/play/<source_id>/<channel_id>", methods=["GET"])
+def stream_request(source_id, channel_id):
+    web = request.args.get("web")
+    ip = request.remote_addr
+
+    logger.info(
+        "IP({}) requested Source({}):Channel({})".format(ip, source_id, channel_id)
+    )
+
+    type = sources[source_id]["type"]
+
+    if type == "mac":
+        stream = mac_build_stream(source_id, channel_id, ip, web)
+    elif type == "xtream":
+        pass
+    elif type == "m3u":
+        pass
+
+    if stream:
+        return Response(
+            stream_with_context(stream_data(stream)),
+            mimetype="application/octet-stream",
+        )
+    else:
+        return make_response("No streams available", 503)
 
 
 @app.route("/dashboard")
@@ -1062,9 +1282,10 @@ def log():
     return log
 
 
-# HD Homerun #
+# endregion
 
 
+# region hdhr
 def hdhr(f):
     @wraps(f)
     def decorated(*args, **kwargs):
@@ -1176,9 +1397,18 @@ def lineup():
     return flask.jsonify(lineup)
 
 
+# endregion
+
 if __name__ == "__main__":
-    config = loadConfig()
-    if "TERM_PROGRAM" in os.environ.keys() and os.environ["TERM_PROGRAM"] == "vscode":
+    convert_configs()
+    settings = load_settings()
+    sources = load_sources()
+    if debug or (
+        "TERM_PROGRAM" in os.environ.keys() and os.environ["TERM_PROGRAM"] == "vscode"
+    ):
+        logger.info(
+            "ATTENTION: Server started in debug mode. Don't use on productive systems!"
+        )
         app.run(host="0.0.0.0", port=8001, debug=True)
     else:
         waitress.serve(app, port=8001, _quiet=True, threads=24)

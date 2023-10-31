@@ -1,6 +1,7 @@
 
 *.pyc
-config.json
+.vscode
 STB-Proxy.log
 changenotes.txt
-.vscode
+settings.json
+sources.json

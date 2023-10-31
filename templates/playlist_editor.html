@@ -7,32 +7,33 @@
             <tr>
                 <th>
                     <div class="form-check form-switch">
-                        <input type="checkbox" class="checkbox form-check-input" onchange="editAll(this)">
+                        <input type="checkbox" class="checkbox form-check-input" onchange="enable_all(this)">
                     </div>
                 </th>
                 <th>Play</th>
                 <th>Name</th>
-                <th>Genre</th>
+                <th>Group</th>
                 <th>Number</th>
                 <th>EPG ID</th>
                 <th>Fallback For</th>
-                <th>Portal</th>
             </tr>
         </thead>
         <tbody>
         </tbody>
     </table>
 
-    <form action="/editor/save" method="post" id="save edits" hidden>
-        <input type="text" id="enabledEdits" name="enabledEdits" value="">
-        <input type="text" id="numberEdits" name="numberEdits" value="">
-        <input type="text" id="nameEdits" name="nameEdits" value="">
-        <input type="text" id="genreEdits" name="genreEdits" value="">
-        <input type="text" id="epgEdits" name="epgEdits" value="">
-        <input type="text" id="fallbackEdits" name="fallbackEdits" value="">
+    <form action="/playlist/save" method="post" id="save" hidden>
+        <input type="text" name="id" value="{{ id }}">
+        <input type="text" id="enable edits" name="enable edits">
+        <input type="text" id="name edits" name="name edits">
+        <input type="text" id="number edits" name="number edits">
+        <input type="text" id="group edits" name="group edits">
+        <input type="text" id="epg edits" name="epg edits">
+        <input type="text" id="fallback edits" name="fallback edits">
     </form>
 
-    <form action="/editor/reset" method="post" id="reset" hidden>
+    <form action="/playlist/reset" method="post" id="reset" hidden>
+        <input type="text" name="id" value="{{ id }}">
     </form>
 
     <!-- Video Modal -->
@@ -55,14 +56,14 @@
 </div>
 
 <script>
-    var enabledEdits = [];
-    var numberEdits = [];
-    var nameEdits = [];
-    var genreEdits = [];
-    var epgEdits = [];
-    var fallbackEdits = [];
+    var enable_edits = [];
+    var number_edits = [];
+    var name_edits = [];
+    var group_edits = [];
+    var epg_edits = [];
+    var fallback_edits = [];
 
-    function editAll(ele) {
+    function enable_all(ele) {
         var checkboxes = document.getElementsByClassName('checkbox');
         var enable = ele.checked;
         for (var i = 0, n = checkboxes.length; i < n; i++) {
@@ -73,73 +74,68 @@
         }
     }
 
-    function editEnabled(ele) {
-        var p = ele.getAttribute('data-portal');
-        var i = ele.getAttribute('data-channelId');
+    function edit_enabled(ele) {
+        var i = ele.getAttribute('data-channel_id');
         var c = ele.checked;
-        var j = { "portal": p, "channel id": i, "enabled": c };
-        enabledEdits.push(j);
+        var j = { "channel id": i, "enabled": c };
+        enable_edits.push(j);
     }
 
-    function editCustomNumber(ele) {
-        var p = ele.getAttribute('data-portal');
-        var i = ele.getAttribute('data-channelId');
+    function edit_custom_number(ele) {
+        var i = ele.getAttribute('data-channel_id');
         var c = ele.value;
-        var j = { "portal": p, "channel id": i, "custom number": c };
-        numberEdits.push(j);
+        var j = { "channel id": i, "custom number": c };
+        number_edits.push(j);
     }
 
-    function editCustomName(ele) {
-        var p = ele.getAttribute('data-portal');
-        var i = ele.getAttribute('data-channelId');
+    function edit_custom_name(ele) {
+        var i = ele.getAttribute('data-channel_id');
         var c = ele.value;
-        var j = { "portal": p, "channel id": i, "custom name": c };
-        nameEdits.push(j);
+        var j = { "channel id": i, "custom name": c };
+        name_edits.push(j);
     }
 
-    function editCustomGenre(ele) {
-        var p = ele.getAttribute('data-portal');
-        var i = ele.getAttribute('data-channelId');
+    function edit_custom_group(ele) {
+        var i = ele.getAttribute('data-channel_id');
         var c = ele.value;
-        var j = { "portal": p, "channel id": i, "custom genre": c };
-        genreEdits.push(j);
+        var j = { "channel id": i, "custom group": c };
+        group_edits.push(j);
     }
 
-    function editCustomEpgId(ele) {
-        var p = ele.getAttribute('data-portal');
-        var i = ele.getAttribute('data-channelId');
+    function edit_custom_epg_id(ele) {
+        var i = ele.getAttribute('data-channel_id');
         var c = ele.value;
-        var j = { "portal": p, "channel id": i, "custom epg id": c };
-        epgEdits.push(j);
+        var j = { "channel id": i, "custom epg id": c };
+        epg_edits.push(j);
     }
 
-    function editFallback(ele) {
-        var p = ele.getAttribute('data-portal');
-        var i = ele.getAttribute('data-channelId');
+    function edit_fallback(ele) {
+        var i = ele.getAttribute('data-channel_id');
         var c = ele.value;
-        var j = { "portal": p, "channel id": i, "channel name": c };
-        fallbackEdits.push(j);
+        var j = { "channel id": i, "fallback": c };
+        fallback_edits.push(j);
     }
 
     function save() {
-        document.getElementById("enabledEdits").value = JSON.stringify(enabledEdits);
-        document.getElementById("numberEdits").value = JSON.stringify(numberEdits);
-        document.getElementById("nameEdits").value = JSON.stringify(nameEdits);
-        document.getElementById("genreEdits").value = JSON.stringify(genreEdits);
-        document.getElementById("epgEdits").value = JSON.stringify(epgEdits);
-        document.getElementById("fallbackEdits").value = JSON.stringify(fallbackEdits);
-        document.getElementById("save edits").submit();
+        document.getElementById("enable edits").value = JSON.stringify(enable_edits);
+        document.getElementById("number edits").value = JSON.stringify(number_edits);
+        document.getElementById("name edits").value = JSON.stringify(name_edits);
+        document.getElementById("group edits").value = JSON.stringify(group_edits);
+        document.getElementById("epg edits").value = JSON.stringify(epg_edits);
+        document.getElementById("fallback edits").value = JSON.stringify(fallback_edits);
+        document.getElementById("save").submit();
     }
 
     var player = document.getElementById("player")
     var title = document.getElementById("channelLabel")
     player.volume = 0.25
-    function selectChannel(ele) {
+
+    function select_channel(ele) {
         link = ele.getAttribute('data-link');
         player.src = link;
-        channel = ele.getAttribute('data-customChannelName');
+        channel = ele.getAttribute('data-custom_channel_name');
         if (channel == "") {
-            channel = ele.getAttribute('data-channelName');
+            channel = ele.getAttribute('data-channel_name');
         }
         title.innerHTML = channel
     }
@@ -188,8 +184,7 @@
                 { targets: 3, className: "align-middle", orderDataType: "dom-text", type: 'string' },
                 { targets: 4, className: "align-middle", orderDataType: "dom-text-numeric" },
                 { targets: 5, className: "align-middle", orderDataType: "dom-text", type: 'string' },
-                { targets: 6, className: "align-middle", orderDataType: "dom-text", type: 'string' },
-                { targets: 7, className: "align-middle" }
+                { targets: 6, className: "align-middle" }
             ],
             language: {
                 search: "",
@@ -219,7 +214,7 @@
                 ],
             },
             ajax: {
-                "url": "{{ url_for('editor_data') }}",
+                "url": "{{ url_for('playlist_table_data', id=id) }}",
                 "dataType": "json",
                 "dataSrc": "data",
                 "contentType": "application/json"
@@ -233,9 +228,8 @@
                                 <input \
                                 type="checkbox" \
                                 class="checkbox form-check-input" \
-                                onchange="editEnabled(this)" \
-                                data-portal="' + row.portal + '" \
-                                data-channelId="' + row.channelId + '"'
+                                onchange="edit_enabled(this)" \
+                                data-channel_id="' + row["channel id"] + '"'
                         if (data == true) {
                             r = r + ' checked';
                         }
@@ -251,93 +245,87 @@
                             title="Play" \
                             data-bs-toggle="modal" \
                             data-bs-target="#videoModal" \
-                            onclick="selectChannel(this)" \
-                            data-channelName="' + row.channelName + '" \
-                            data-customChannelName="' + row.customChannelName + '" \
-                            data-link="' + row.link + '">\
+                            onclick="select_channel(this)" \
+                            data-channel_name="' + row["channel name"] + '" \
+                            data-custom_channel_name="' + row["custom channel name"] + '" \
+                            data-link="' + row["link"] + '">\
                             <i class="fa fa-play"></i>\
                         </button>'
                     }
                 },
                 {
-                    data: "channelName",
+                    data: "channel name",
                     render: function (data, type, row, meta) {
                         return '<input \
                                 type="text" \
                                 class="form-control" \
                                 style="min-width: 200px;" \
-                                onchange="editCustomName(this)" \
-                                data-portal="' + row.portal + '" \
-                                data-channelId="' + row.channelId + '" \
-                                placeholder="' + row.channelName + '" \
-                                title="' + row.channelName + '" \
-                                value="' + row.customChannelName +
+                                onchange="edit_custom_name(this)" \
+                                data-channel_id="' + row["channel id"] + '" \
+                                placeholder="' + row["channel name"] + '" \
+                                title="' + row["channel name"] + '" \
+                                value="' + row["custom channel name"] +
                             '">'
                     },
                 },
                 {
-                    data: "genre",
+                    data: "group",
                     render: function (data, type, row, meta) {
                         return '<input \
                                 type="text" \
                                 class="form-control" \
                                 style="min-width: 200px;" \
-                                onchange="editCustomGenre(this)" \
-                                data-portal="' + row.portal + '" \
-                                data-channelId="' + row.channelId + '" \
-                                placeholder="' + row.genre + '" \
-                                title="' + row.genre + '" \
-                                value="' + row.customGenre +
+                                onchange="edit_custom_group(this)" \
+                                data-channel_id="' + row["channel id"] + '" \
+                                placeholder="' + row["group"] + '" \
+                                title="' + row["group"] + '" \
+                                value="' + row["custom group"] +
                             '">'
                     },
                 },
                 {
-                    data: "channelNumber",
+                    data: "channel number",
                     render: function (data, type, row, meta) {
                         return '<input \
                                 type="test" \
                                 class="form-control" \
                                 style="min-width: 100px;" \
-                                onchange="editCustomNumber(this)" \
-                                data-portal="' + row.portal + '" \
-                                data-channelId="' + row.channelId + '" \
-                                placeholder="' + row.channelNumber + '" \
-                                title="' + row.channelNumber + '" \
-                                value="' + row.customChannelNumber +
+                                onchange="edit_custom_number(this)" \
+                                data-channel_id="' + row["channel id"] + '" \
+                                placeholder="' + row["channel number"] + '" \
+                                title="' + row["channel number"] + '" \
+                                value="' + row["custom channel number"] +
                             '">'
                     },
                 },
                 {
-                    data: "channelId",
+                    data: "epg id",
                     render: function (data, type, row, meta) {
                         return '<input \
                                 type="text" \
                                 class="form-control" \
                                 style="min-width: 200px;" \
-                                onchange="editCustomEpgId(this)" \
-                                data-portal="' + row.portal + '" \
-                                data-channelId="' + row.channelId + '" \
-                                placeholder="' + row.portal + row.channelId + '" \
-                                title="' + row.portal + row.channelId + '" \
-                                value="' + row.customEpgId +
+                                onchange="edit_custom_epg_id(this)" \
+                                data-channel_id="' + row["channel id"] + '" \
+                                placeholder="' + row["epg id"] + '" \
+                                title="' + row["epg id"] + '" \
+                                value="' + row["custom epg id"] +
                             '">'
                     },
                 },
                 {
-                    data: "fallbackChannel",
+                    data: "fallback",
                     render: function (data, type, row, meta) {
                         return '<input \
                                 type="text" \
                                 class="form-control" \
                                 style="min-width: 200px;" \
-                                onchange="editFallback(this)" \
-                                data-portal="' + row.portal + '" \
-                                data-channelId="' + row.channelId + '" \
-                                value="' + row.fallbackChannel +
+                                onchange="edit_fallback(this)" \
+                                data-channel_id="' + row["channel id"] + '" \
+                                value="' + row["fallback"] +
                             '">'
-                    }
+                    },
                 },
-                { data: "portalName" },
             ],
         });
     });

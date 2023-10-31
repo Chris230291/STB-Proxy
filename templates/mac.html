@@ -1,0 +1,231 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="container-fluid text-light p-lg-5">
+
+    {% if source["name"] %}
+    <div class="btn-group">
+        <button class="btn btn-success" title="Save" form="save"><i class="fa fa-floppy-o"></i> Save</button>
+        <button type="button" class="btn btn-success dropdown-toggle dropdown-toggle-split" data-bs-toggle="dropdown">
+            <span class="visually-hidden">Toggle Dropdown</span>
+        </button>
+        <ul class="dropdown-menu dropdown-menu-dark">
+            <button type="button" class="dropdown-item" title="Retest" onclick="retest()"><i class="fa fa-flask"></i>
+                Save & Retest</button>
+        </ul>
+    </div>
+    <button class="btn btn-danger" title="Delete" form="delete" onclick="return confirm('Are you sure?')"><i
+            class="fa fa-trash-o"></i> Delete</button>
+    {% else %}
+    <button class="btn btn-success btn-block" title="Save" form="save"><i class="fa fa-floppy-o"></i> Save</button>
+    {% endif %}
+
+    <br><br>
+
+    <form action="/source/delete" id="delete" method="post">
+        <input type="text" name="id" value="{{ id }}" hidden>
+    </form>
+
+    <form action="/source/save" id="save" method="post">
+
+        <input type="text" name="id" value="{{ id }}" hidden>
+        <input type="text" name="type" value="mac" hidden>
+        <input type="checkbox" name="retest" id="retest" hidden>
+        <input type="text" name="macs" id="macs" value="{{ source['macs'] }}" hidden>
+
+        <h6>Enabled:</h6>
+        <div class="form-check form-switch">
+            <input type="checkbox" class="checkbox form-check-input" name="enabled" {{ "checked" if source['enabled']
+                }}>
+        </div>
+        <span class="text-muted">Disabling will hide this server from clients</span>
+
+        <br><br>
+
+        <h6>Name:</h6>
+        <input type="text" name="name" class="form-control flex-fill" title="Name" value="{{ source['name'] }}"
+            required>
+        <span class="text-muted">Give this server a recognisable name</span>
+
+        <br><br>
+
+        <h6>URL:</h6>
+        <input type="text" name="url" class="form-control flex-fill" title="URL" pattern="http.*\.php"
+            value="{{ source['url'] }}" required>
+        <span class="text-muted">Enter the full URL ending in '.php'</span>
+
+        <br><br>
+
+        <h6>EPG Time Offset:</h6>
+        <input type="number" name="epg time offset" id="editEpgTimeOffset" class="form-control flex-fill"
+            title="EPG Time Offset" min="-12" max="14" step="0.5" value="{{ source['epg time offset'] }}" required>
+        <span class="text-muted">Time offset for XMLTV EPG data (Reference UTC)</span>
+
+        <br><br>
+
+    </form>
+
+    <h6>Accounts:</h6>
+    <table class="table table-striped table-dark nowrap" id="table">
+        <thead>
+            <th>MAC</th>
+            <th>Proxy</th>
+            <th>Max Streams</th>
+            <th>Expires</th>
+            <th>Playtime</th>
+            <th>Errors</th>
+            <th>Requests</th>
+            <th></th>
+        </thead>
+        <tbody>
+            {% for i in source['macs'] %}
+            <tr>
+                <td>{{ source['macs'][i]['mac'] }}</td>
+                <td>
+                    <input type="text" class="form-control flex-fill" name="proxy"
+                        value="{{ source['macs'][i]['proxy'] }}" data-uuid="{{ i }}" onchange="edit_mac(this)">
+                </td>
+                <td>
+                    <input type="number" class="form-control flex-fill" name="max streams" min="0"
+                        value="{{ source['macs'][i]['max streams'] }}" data-uuid="{{ i }}" onchange="edit_mac(this)">
+                </td>
+                <td><span name="expiryString">{{ source['macs'][i]['expiry'] }}</span></td>
+                <td>{{ source['macs'][i]['playtime'] }}</td>
+                <td>{{ source['macs'][i]['errors'] }}</td>
+                <td>{{ source['macs'][i]['requests'] }}</td>
+                <td><button class="btn btn-danger btn-block" name="delete" title="Delete" data-uuid="{{ i }}"
+                        onclick="edit_mac(this)"><i class="fa fa-trash"></i> Delete</button></td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <br>
+
+    <button class="btn btn-success btn-block" title="Add MAC" data-bs-toggle="modal" data-bs-target="#modal_add_macs"><i
+            class="fa fa-plus"></i> Add MAC</button>
+
+
+    <!-- Add MAC Modal -->
+    <div class="modal fade text-dark" id="modal_add_macs">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Add MAC's</h5>
+                </div>
+                <div class="modal-body">
+
+                    <input type="text" class="form-control flex-fill" id="new_macs">
+                    <span class="text-muted">Supports a comma seperated list of MAC's</span>
+                    <br><br>
+
+                    <div class="modal-footer">
+                        <button class="btn btn-secondary" title="Cancel" data-bs-dismiss="modal">Cancel</button>
+                        <button class="btn btn-success btn-block" title="Add" data-bs-dismiss="modal"
+                            onclick="add_macs()"><i class="fa fa-plus"></i>
+                            Add</button>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+
+    $(document).ready(function () {
+        table = $('#table').DataTable({
+            "paging": false,
+            "searching": false,
+            "ordering": false,
+            "info": false,
+            "language": {
+                "emptyTable": "MAC's will be listed here"
+            },
+            columnDefs: [
+                { targets: [0, 3, 4, 5, 6], className: "align-middle" },
+            ]
+        });
+    });
+
+    $('#modal_add_macs').on('hidden.bs.modal', function () {
+        document.getElementById('new_macs').value = "";
+    })
+
+    function add_macs() {
+        macs = document.getElementById('new_macs').value.split(",");
+        macs.forEach(add_mac);
+    }
+
+    function add_mac(value) {
+        var uuid = crypto.randomUUID().replace(/-/g, '');
+        const regex = /^([0-9A-F]{2}:){5}([0-9A-F]{2})$/;
+
+        if (regex.test(value)) {
+            table.row.add([
+                value,
+                "<input type='text' class='form-control flex-fill' name='proxy' data-uuid='" + uuid + "' onchange='edit_mac(this)'>",
+                "<input type='number' class='form-control flex-fill' name='max streams' value='1' data-uuid='" + uuid + "' onchange='edit_mac(this)'>",
+                "Untested",
+                "0",
+                "0",
+                "0",
+                "<button class='btn btn-danger btn-block' name='delete' title='Delete' data-uuid='" + uuid + "' onclick='edit_mac(this)'><i class='fa fa-trash'></i> Delete</button>",
+            ]).draw();
+
+            var macs_field = document.getElementById("macs");
+            var data = JSON.parse(macs_field.value.replace(/'/g, '"'));
+            console.log(data);
+            data[uuid] = { 'mac': value, 'proxy': "", 'max streams': 1, 'expiry': 'Untested' };
+
+            macs_field.value = JSON.stringify(data);
+        }
+    };
+
+    function edit_mac(ele) {
+        var macs_field = document.getElementById("macs");
+        var data = JSON.parse(macs_field.value.replace(/'/g, '"'));
+        var field = ele.name;
+        var uuid = ele.getAttribute("data-uuid");
+
+        if (field == "delete") {
+            delete data[uuid];
+            table.row($(ele).parents('tr')).remove().draw();
+        } else if (field == "mac") {
+            data[uuid]["mac"] = ele.value
+        } else if (field == "proxy") {
+            data[uuid]["proxy"] = ele.value
+        } else if (field == "max streams") {
+            data[uuid]["max streams"] = ele.value;
+        }
+
+        macs_field.value = JSON.stringify(data)
+    };
+
+    function retest() {
+        document.getElementById('retest').checked = true;
+        document.getElementById("save").submit();
+    }
+
+    const now = Date.now();
+    const dateFormat = { year: 'numeric', month: '2-digit', day: '2-digit' };
+    var expiries = document.getElementsByName("expiryString");
+    for (i in expiries) {
+        var expires = expiries[i].innerText * 1000;
+        if (!isNaN(expires)) {
+            var diff = expires - now;
+            var daysAway = diff / (1000 * 3600 * 24);
+            if (now > expires) {
+                expiries[i].parentElement.parentElement.classList.add("table-danger");
+            } else if (daysAway < 30) {
+                expiries[i].parentElement.parentElement.classList.add("table-warning");
+            }
+            var formattedDate = new Date(expires).toLocaleDateString(undefined, dateFormat);
+            expiries[i].innerHTML = formattedDate;
+        }
+    }
+
+</script>
+
+{% endblock %}
